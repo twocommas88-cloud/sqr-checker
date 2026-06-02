@@ -622,37 +622,41 @@ export default function Results() {
           {/* Table */}
           <div className="flex-1 overflow-auto px-8 pb-8">
             <div className="border border-border rounded-xl overflow-hidden">
-              <table className="w-full text-sm min-w-[1300px]">
+              <table className="w-full text-sm min-w-[1500px]">
                 <thead className="bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   <tr>
-                    <th className="text-left px-4 py-3 w-[300px] min-w-[260px]">Search Term</th>
-                    <th className="text-right px-3 py-3 w-[80px]">Impr.</th>
-                    <th className="text-right px-3 py-3 w-[65px]">Clicks</th>
-                    <th className="text-right px-3 py-3 w-[70px]">Conv.</th>
-                    <th className="text-right px-3 py-3 w-[70px]">Cost</th>
-                    <th className="text-left px-3 py-3 w-[100px]">Relevance</th>
-                    <th className="text-left px-3 py-3">Reason</th>
-                    <th className="text-left px-3 py-3 w-[100px]">Add Level</th>
-                    <th className="text-left px-3 py-3 w-[75px]">New KW?</th>
+                    <th className="text-left px-4 py-3 w-[260px] min-w-[220px]">Search Term</th>
+                    <th className="text-left px-3 py-3 w-[120px]">Campaign</th>
                     <th className="text-left px-3 py-3 w-[120px]">Ad Group</th>
-                    <th className="text-left px-3 py-3 w-[75px]">Comp.</th>
-                    <th className="text-left px-3 py-3 w-[110px]">Neg. N-gram</th>
-                    <th className="text-left px-3 py-3 w-[110px]">Out-of-Area</th>
+                    <th className="text-right px-3 py-3 w-[70px]">Impr.</th>
+                    <th className="text-right px-3 py-3 w-[60px]">Clicks</th>
+                    <th className="text-right px-3 py-3 w-[60px]">Conv.</th>
+                    <th className="text-right px-3 py-3 w-[60px]">Cost</th>
+                    <th className="text-left px-3 py-3 w-[90px]">Relevance</th>
+                    <th className="text-left px-3 py-3">Reason</th>
+                    <th className="text-left px-3 py-3 w-[90px]">Add Level</th>
+                    <th className="text-left px-3 py-3 w-[70px]">New KW?</th>
+                    <th className="text-left px-3 py-3 w-[110px]">Ad Group</th>
+                    <th className="text-left px-3 py-3 w-[70px]">Comp.</th>
+                    <th className="text-left px-3 py-3 w-[100px]">Neg. N-gram</th>
+                    <th className="text-left px-3 py-3 w-[100px]">Out-of-Area</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={13} className="px-4 py-10 text-center text-muted-foreground text-sm">No results match your filters</td></tr>
+                    <tr><td colSpan={15} className="px-4 py-10 text-center text-muted-foreground text-sm">No results match your filters</td></tr>
                   ) : filtered.map((r, i) => {
                     const matchedNgram = r.relevance === "Irrelevant" ? findMatchingNgram(r.searchTerm, ngrams) : null;
                     return (
                       <tr key={i} className="hover:bg-muted/20 transition-colors" data-testid={`row-result-${i}`}>
-                        <td className="px-4 py-2.5 font-medium text-foreground w-[300px] min-w-[260px]">
+                        <td className="px-4 py-2.5 font-medium text-foreground w-[260px] min-w-[220px]">
                           <span className="break-words block" title={r.searchTerm}>{r.searchTerm}</span>
                           {r.matchedKeyword && (
                             <span className="text-xs text-muted-foreground truncate block" title={r.matchedKeyword}>→ {r.matchedKeyword}</span>
                           )}
                         </td>
+                        <td className="px-3 py-2.5 text-xs text-muted-foreground truncate" title={r.campaignName ?? ""}>{r.campaignName ?? "—"}</td>
+                        <td className="px-3 py-2.5 text-xs text-muted-foreground truncate" title={r.adGroupName ?? ""}>{r.adGroupName ?? "—"}</td>
                         <td className="px-3 py-2.5 text-right text-muted-foreground">{r.impressions?.toLocaleString() ?? "—"}</td>
                         <td className="px-3 py-2.5 text-right text-muted-foreground">{r.clicks?.toLocaleString() ?? "—"}</td>
                         <td className="px-3 py-2.5 text-right text-muted-foreground">{r.conversions ?? "—"}</td>
