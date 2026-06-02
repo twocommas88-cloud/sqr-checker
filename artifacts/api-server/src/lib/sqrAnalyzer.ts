@@ -6,6 +6,8 @@ export interface SearchTermData {
   clicks?: number | null;
   conversions?: number | null;
   cost?: number | null;
+  campaignName?: string | null;
+  adGroupName?: string | null;
 }
 
 export interface SearchTermResult {
@@ -14,6 +16,8 @@ export interface SearchTermResult {
   clicks?: number | null;
   conversions?: number | null;
   cost?: number | null;
+  campaignName?: string | null;
+  adGroupName?: string | null;
   relevance: "Relevant" | "Irrelevant";
   reason: string;
   addLevel: "Campaign" | "Ad Group" | "None";
@@ -107,6 +111,8 @@ function parseSearchTerms(raw: string): SearchTermData[] {
   let colImpressions: number | null = null;
   let colCost: number | null = null;
   let colConversions: number | null = null;
+  let colCampaign: number | null = null;
+  let colAdGroup: number | null = null;
   let headerFound = false;
 
   for (const line of lines) {
@@ -122,6 +128,8 @@ function parseSearchTerms(raw: string): SearchTermData[] {
       colImpressions = cols.findIndex((c) => c === "impr." || c === "impressions");
       colCost = cols.findIndex((c) => c === "cost");
       colConversions = cols.findIndex((c) => c === "conversions");
+      colCampaign = cols.findIndex((c) => c === "campaign" || c === "campaign name");
+      colAdGroup = cols.findIndex((c) => c === "ad group" || c === "ad group name");
       headerFound = true;
       continue;
     }
@@ -145,6 +153,8 @@ function parseSearchTerms(raw: string): SearchTermData[] {
         clicks: colClicks != null && colClicks >= 0 ? safeNum(parts[colClicks]) : null,
         conversions: colConversions != null && colConversions >= 0 ? safeNum(parts[colConversions]) : null,
         cost: colCost != null && colCost >= 0 ? safeNum(parts[colCost]) : null,
+        campaignName: colCampaign != null && colCampaign >= 0 ? parts[colCampaign] : null,
+        adGroupName: colAdGroup != null && colAdGroup >= 0 ? parts[colAdGroup] : null,
       });
     }
   }
