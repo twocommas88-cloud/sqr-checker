@@ -38,17 +38,6 @@ type AnalysisResult = {
 
 // ── N-gram extraction ────────────────────────────────────────────────────────
 
-const STOP_WORDS = new Set([
-  "a","an","the","and","or","but","in","on","at","to","for","of","with","by","as",
-  "is","are","was","were","be","been","being","have","has","had","do","does","did",
-  "will","would","could","should","may","might","can","not","no","nor","so","yet",
-  "if","when","where","how","what","who","which","that","this","these","those",
-  "it","its","i","me","my","we","our","you","your","he","she","they","their",
-  "from","about","into","through","after","before","up","down","out","off","over",
-  "under","get","got","go","gone","come","came","make","made","take","took",
-  "near","&","vs","–","—",
-]);
-
 const STATUS_WORDS = new Set(["enabled", "paused", "removed", "keyword status"]);
 const MATCH_TYPE_WORDS = new Set(["broad match", "phrase match", "exact match", "broad", "phrase", "exact"]);
 
@@ -102,15 +91,26 @@ function parseActiveKeywordPhrases(activeKeywords: string): Set<string> {
   return kwSet;
 }
 
-function conflictsWithActiveKeywords(ngram: string, activeKwPhrases: Set<string>): boolean {
-  for (const kw of activeKwPhrases) {
-    if (kw === ngram || kw.includes(ngram)) return true;
+function getActiveKeywordWords(activeKeywords: string): Set<string> {
+  // Build a set of every individual word that appears in any active keyword
+  const words = new Set<string>();
+  for (const phrase of parseActiveKeywordPhrases(activeKeywords)) {
+    for (const w of phrase.split(/\s+/)) {
+      if (w.length > 2) words.add(w);
+    }
   }
-  return false;
+  return words;
+}
+
+function conflictsWithActiveKeywords(ngram: string, activeKwWords: Set<string>): boolean {
+  // A 1-word negative "ngram" is a conflict if it is one of the individual words
+  // that appears in any active keyword. E.g. if "junk" is a keyword word, don't
+  // suggest "junk" as a negative term.
+  return activeKwWords.has(ngram);
 }
 
 function extractNgrams(irrelevantTerms: string[], activeKeywords: string): string[] {
-  const activeKwPhrases = parseActiveKeywordPhrases(activeKeywords);
+  const activeKwWords = getActiveKeywordWords(activeKeywords);
   const freq: Record<string, number> = {};
 
   for (const term of irrelevantTerms) {
@@ -118,7 +118,7 @@ function extractNgrams(irrelevantTerms: string[], activeKeywords: string): strin
       .toLowerCase()
       .replace(/[^a-z0-9\s'-]/g, " ")
       .split(/\s+/)
-      .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
+      .filter((w) => w.length > 2);
 
     // Unigrams only (1-word negative terms)
     for (const word of words) {
@@ -129,7 +129,7 @@ function extractNgrams(irrelevantTerms: string[], activeKeywords: string): strin
   return Object.entries(freq)
     .filter(([ngram, count]) => {
       if (count < 3) return false; // must appear in 3+ irrelevant terms
-      if (conflictsWithActiveKeywords(ngram, activeKwPhrases)) return false;
+      if (conflictsWithActiveKeywords(ngram, activeKwWords)) return false;
       return true;
     })
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
@@ -138,8 +138,7 @@ function extractNgrams(irrelevantTerms: string[], activeKeywords: string): strin
 
 function findMatchingNgram(term: string, ngrams: string[]): string | null {
   const termLower = term.toLowerCase();
-  const sorted = [...ngrams].sort((a, b) => b.split(" ").length - a.split(" ").length);
-  for (const ng of sorted) {
+  for (const ng of ngrams) {
     if (termLower.includes(ng)) return ng;
   }
   return null;
@@ -551,22 +550,23 @@ export default function Results() {
               </div>
             )}
 
-            {/* Out-of-area terms — Phrase Match */}
+            {/* Out-of-area locations — list unique area names */}
             {(() => {
               const ooa = results.filter((r) => r.outOfAreaLocation || (r.relevance === "Irrelevant" && r.reason?.toLowerCase().includes("outside target service area")));
+              const uniqueLocations = Array.from(new Set(ooa.map((r) => r.outOfAreaLocation ?? "").filter(Boolean)));
               return ooa.length > 0 ? (
                 <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
                   <p className="text-sm font-semibold text-purple-800 mb-1 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4" />
-                    Out-of-Area Terms — Phrase Match Negatives ({ooa.length})
+                    Out-of-Area Locations ({uniqueLocations.length})
                   </p>
                   <p className="text-xs text-purple-700/70 mb-2">
-                    Search terms flagged as outside your target service area. Add as phrase match negatives to stop paying for out-of-area clicks.
+                    Location names found in search terms that are outside your target service area. Add as phrase match negatives to stop paying for out-of-area clicks.
                   </p>
                   <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
-                    {ooa.map((r, i) => (
-                      <code key={i} className="text-xs bg-white border border-purple-200 text-purple-800 px-2 py-0.5 rounded font-mono" data-testid={`ooa-phrase-${i}`}>
-                        "{r.searchTerm}"
+                    {uniqueLocations.map((loc, i) => (
+                      <code key={i} className="text-xs bg-white border border-purple-200 text-purple-800 px-2 py-0.5 rounded font-mono" data-testid={`ooa-loc-${i}`}>
+                        "{loc}"
                       </code>
                     ))}
                   </div>
