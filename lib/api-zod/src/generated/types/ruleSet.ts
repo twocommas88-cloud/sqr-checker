@@ -30,6 +30,11 @@ export interface RuleSet {
      * @nullable
      */
   targetLocations?: string | null;
+  /**
+     * Saved brand terms that should always be considered relevant
+     * @nullable
+     */
+  relevantBrandTerms?: string | null;
   createdAt: string;
   updatedAt: string;
 }

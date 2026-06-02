@@ -20,6 +20,7 @@ function serializeRuleSet(r: typeof ruleSets.$inferSelect) {
     activeKeywords: r.activeKeywords ?? null,
     landingPageUrl: r.landingPageUrl ?? null,
     targetLocations: r.targetLocations ?? null,
+    relevantBrandTerms: r.relevantBrandTerms ?? null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };
@@ -48,6 +49,7 @@ router.post("/rules", async (req, res): Promise<void> => {
       activeKeywords: rest.activeKeywords ?? null,
       landingPageUrl: rest.landingPageUrl ?? null,
       targetLocations: rest.targetLocations ?? null,
+      relevantBrandTerms: rest.relevantBrandTerms ?? null,
     })
     .returning();
   res.status(201).json(serializeRuleSet(row));
@@ -86,6 +88,7 @@ router.put("/rules/:id", async (req, res): Promise<void> => {
       ...(competitorBrands !== undefined && { competitorBrands: JSON.stringify(competitorBrands) }),
       ...(excludePatterns !== undefined && { excludePatterns: JSON.stringify(excludePatterns) }),
       ...(customRules !== undefined && { customRules: JSON.stringify(customRules) }),
+      ...(rest.relevantBrandTerms !== undefined && { relevantBrandTerms: rest.relevantBrandTerms }),
       updatedAt: new Date(),
     })
     .where(eq(ruleSets.id, params.data.id))

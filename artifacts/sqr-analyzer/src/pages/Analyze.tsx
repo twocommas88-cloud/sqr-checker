@@ -10,6 +10,7 @@ interface FormData {
   name: string;
   landingPageUrl: string;
   targetLocations: string;
+  relevantBrandTerms: string;
   activeKeywords: string;
   searchTerms: string;
   ruleSetId: string;
@@ -26,12 +27,14 @@ export default function Analyze() {
   const [competitorBrands, setCompetitorBrands] = useState<string[]>([]);
   const [excludePatterns, setExcludePatterns] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [relevantBrandTerms, setRelevantBrandTerms] = useState<string[]>([]);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       name: "",
       landingPageUrl: "",
       targetLocations: "",
+      relevantBrandTerms: "",
       activeKeywords: "",
       searchTerms: "",
       ruleSetId: "",
@@ -54,6 +57,7 @@ export default function Analyze() {
         if (rs.activeKeywords) setValue("activeKeywords", rs.activeKeywords);
         if (rs.landingPageUrl) setValue("landingPageUrl", rs.landingPageUrl);
         if (rs.targetLocations) setValue("targetLocations", rs.targetLocations);
+        if (rs.relevantBrandTerms) setValue("relevantBrandTerms", rs.relevantBrandTerms);
       }
     }
   }
@@ -68,6 +72,7 @@ export default function Analyze() {
         name: data.name || `Analysis ${new Date().toLocaleDateString()}`,
         landingPageUrl: data.landingPageUrl || undefined,
         targetLocations: data.targetLocations || undefined,
+        relevantBrandTerms: data.relevantBrandTerms || undefined,
         activeKeywords: data.activeKeywords,
         searchTerms: data.searchTerms,
         ruleSetId: data.ruleSetId ? parseInt(data.ruleSetId) : null,

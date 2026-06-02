@@ -19,4 +19,6 @@ export interface RuleSetInput {
   landingPageUrl?: string;
   /** Target service locations to save with this account profile */
   targetLocations?: string;
+  /** Comma-separated brand names that should always be considered relevant */
+  relevantBrandTerms?: string;
 }

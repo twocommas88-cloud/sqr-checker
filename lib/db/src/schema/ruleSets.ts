@@ -13,6 +13,7 @@ export const ruleSets = pgTable("rule_sets", {
   activeKeywords: text("active_keywords"),
   landingPageUrl: text("landing_page_url"),
   targetLocations: text("target_locations"),
+  relevantBrandTerms: text("relevant_brand_terms").notNull().default("[]"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

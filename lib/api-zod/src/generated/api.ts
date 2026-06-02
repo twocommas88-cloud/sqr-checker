@@ -31,6 +31,7 @@ export const ListRulesResponseItem = zod.object({
   "activeKeywords": zod.string().nullish().describe('Saved active keywords for this account profile'),
   "landingPageUrl": zod.string().nullish().describe('Saved landing page URL for this account profile'),
   "targetLocations": zod.string().nullish().describe('Saved target service locations for this account profile'),
+  "relevantBrandTerms": zod.string().nullish().describe('Saved brand terms that should always be considered relevant'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -49,7 +50,8 @@ export const CreateRuleSetBody = zod.object({
   "minConversionsForNewKeyword": zod.number().optional(),
   "activeKeywords": zod.string().optional().describe('Active keywords to save with this account profile'),
   "landingPageUrl": zod.string().optional().describe('Landing page URL to save with this account profile'),
-  "targetLocations": zod.string().optional().describe('Target service locations to save with this account profile')
+  "targetLocations": zod.string().optional().describe('Target service locations to save with this account profile'),
+  "relevantBrandTerms": zod.string().optional().describe('Comma-separated brand names that should always be considered relevant')
 })
 
 
@@ -71,6 +73,7 @@ export const GetRuleSetResponse = zod.object({
   "activeKeywords": zod.string().nullish().describe('Saved active keywords for this account profile'),
   "landingPageUrl": zod.string().nullish().describe('Saved landing page URL for this account profile'),
   "targetLocations": zod.string().nullish().describe('Saved target service locations for this account profile'),
+  "relevantBrandTerms": zod.string().nullish().describe('Saved brand terms that should always be considered relevant'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -92,7 +95,8 @@ export const UpdateRuleSetBody = zod.object({
   "minConversionsForNewKeyword": zod.number().optional(),
   "activeKeywords": zod.string().optional().describe('Active keywords to save with this account profile'),
   "landingPageUrl": zod.string().optional().describe('Landing page URL to save with this account profile'),
-  "targetLocations": zod.string().optional().describe('Target service locations to save with this account profile')
+  "targetLocations": zod.string().optional().describe('Target service locations to save with this account profile'),
+  "relevantBrandTerms": zod.string().optional().describe('Comma-separated brand names that should always be considered relevant')
 })
 
 export const UpdateRuleSetResponse = zod.object({
@@ -106,6 +110,7 @@ export const UpdateRuleSetResponse = zod.object({
   "activeKeywords": zod.string().nullish().describe('Saved active keywords for this account profile'),
   "landingPageUrl": zod.string().nullish().describe('Saved landing page URL for this account profile'),
   "targetLocations": zod.string().nullish().describe('Saved target service locations for this account profile'),
+  "relevantBrandTerms": zod.string().nullish().describe('Saved brand terms that should always be considered relevant'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -150,7 +155,8 @@ export const CreateAnalysisBody = zod.object({
   "competitorBrands": zod.array(zod.string()).optional(),
   "excludePatterns": zod.array(zod.string()).optional(),
   "customRules": zod.array(zod.string()).optional(),
-  "minConversionsForNewKeyword": zod.number().optional()
+  "minConversionsForNewKeyword": zod.number().optional(),
+  "relevantBrandTerms": zod.string().optional().describe('Comma-separated brand names that should always be considered relevant')
 })
 
 
@@ -177,6 +183,7 @@ export const GetAnalysisResponse = zod.object({
   "activeKeywords": zod.string().optional().describe('The raw active keywords string used for this analysis'),
   "targetLocations": zod.string().nullish().describe('Target service locations used for this analysis'),
   "landingPageUrl": zod.string().nullish().describe('Landing page URL used for this analysis'),
+  "relevantBrandTerms": zod.string().nullish().describe('Brand terms that should always be considered relevant for this analysis'),
   "competitorBrands": zod.array(zod.string()).optional(),
   "excludePatterns": zod.array(zod.string()).optional(),
   "customRules": zod.array(zod.string()).optional(),

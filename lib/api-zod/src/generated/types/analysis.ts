@@ -26,6 +26,11 @@ export interface Analysis {
      * @nullable
      */
   landingPageUrl?: string | null;
+  /**
+     * Brand terms that should always be considered relevant for this analysis
+     * @nullable
+     */
+  relevantBrandTerms?: string | null;
   competitorBrands?: string[];
   excludePatterns?: string[];
   customRules?: string[];

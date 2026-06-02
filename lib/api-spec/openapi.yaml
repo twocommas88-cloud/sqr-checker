@@ -242,6 +242,9 @@ components:
         targetLocations:
           type: ["string", "null"]
           description: Saved target service locations for this account profile
+        relevantBrandTerms:
+          type: ["string", "null"]
+          description: Saved brand terms that should always be considered relevant
         createdAt:
           type: string
         updatedAt:
@@ -278,6 +281,9 @@ components:
         targetLocations:
           type: string
           description: Target service locations to save with this account profile
+        relevantBrandTerms:
+          type: string
+          description: Comma-separated brand names that should always be considered relevant
 
     AnalysisInput:
       type: object
@@ -313,6 +319,9 @@ components:
             type: string
         minConversionsForNewKeyword:
           type: integer
+        relevantBrandTerms:
+          type: string
+          description: Comma-separated brand names that should always be considered relevant
 
     SearchTermResult:
       type: object
@@ -370,6 +379,9 @@ components:
         landingPageUrl:
           type: ["string", "null"]
           description: Landing page URL used for this analysis
+        relevantBrandTerms:
+          type: ["string", "null"]
+          description: Brand terms that should always be considered relevant for this analysis
         competitorBrands:
           type: array
           items:

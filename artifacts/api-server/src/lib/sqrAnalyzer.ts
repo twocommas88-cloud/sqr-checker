@@ -33,6 +33,7 @@ export interface AnalysisOptions {
   searchTerms: string;
   accountName?: string;
   targetLocations?: string | null;
+  relevantBrandTerms?: string | null;
   competitorBrands?: string[];
   excludePatterns?: string[];
   customRules?: string[];
@@ -243,6 +244,10 @@ async function analyzeTermsBatch(
     ? `\nOWN BRAND: The account being analyzed is "${options.accountName}". Search terms that reference THIS account's own brand name are NOT competitors — do NOT set isCompetitor=true for them. Only set isCompetitor=true for search terms that clearly reference a DIFFERENT competing brand.\n`
     : "";
 
+  const relevantBrandSection = options.relevantBrandTerms?.trim()
+    ? `\nRELEVANT BRAND TERMS: The following brand names should ALWAYS be considered Relevant (even if they also look like competitors — they are your own brands or partner brands): ${options.relevantBrandTerms.trim()}\n`
+    : "";
+
   const locationSection = options.targetLocations?.trim()
     ? `\nTARGET SERVICE LOCATIONS: ${options.targetLocations.trim()}
 - Search terms that mention a specific location NOT in this list → Irrelevant (addLevel: "Campaign"), reason: "Outside target service area"
@@ -253,6 +258,8 @@ async function analyzeTermsBatch(
   const termsJson = JSON.stringify(
     terms.map((t) => ({
       searchTerm: t.searchTerm,
+      campaignName: t.campaignName,
+      adGroupName: t.adGroupName,
       impressions: t.impressions,
       clicks: t.clicks,
       conversions: t.conversions,
@@ -264,7 +271,7 @@ async function analyzeTermsBatch(
 
 Active Keywords in this account (keyword | match type | ad group):
 ${activeKeywords || "Not provided"}
-${pageSection}${ownBrandSection}${locationSection}
+${pageSection}${ownBrandSection}${relevantBrandSection}${locationSection}
 ${competitorList}
 ${excludeList ? excludeList + "\n" : ""}${customRulesList ? customRulesList + "\n" : ""}
 RELEVANCE PHILOSOPHY — READ CAREFULLY:
@@ -316,7 +323,8 @@ outOfAreaLocation: If the term is flagged as outside the target service area, se
   return parsed.map((item, i) => ({
     ...terms[i],
     searchTerm: item.searchTerm ?? terms[i]?.searchTerm ?? "",
-    relevance: item.relevance ?? "Irrelevant",
+    // Relevance MUST be strictly "Relevant" or "Irrelevant" — normalize anything else
+    relevance: item.relevance === "Relevant" ? "Relevant" : "Irrelevant",
     reason: item.reason ?? "",
     addLevel: item.addLevel ?? "None",
     addAsKeyword: item.addAsKeyword ?? false,

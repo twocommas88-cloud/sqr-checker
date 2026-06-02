@@ -22,4 +22,6 @@ export interface AnalysisInput {
   excludePatterns?: string[];
   customRules?: string[];
   minConversionsForNewKeyword?: number;
+  /** Comma-separated brand names that should always be considered relevant */
+  relevantBrandTerms?: string;
 }

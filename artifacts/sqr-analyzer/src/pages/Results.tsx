@@ -26,6 +26,8 @@ type AnalysisResult = {
   clicks?: number | null;
   conversions?: number | null;
   cost?: number | null;
+  campaignName?: string | null;
+  adGroupName?: string | null;
   relevance: string;
   reason: string;
   addLevel: string;
@@ -147,9 +149,11 @@ function findMatchingNgram(term: string, ngrams: string[]): string | null {
 // ── CSV download ─────────────────────────────────────────────────────────────
 
 function downloadCSV(results: AnalysisResult[], name: string) {
-  const headers = ["Search Term","Impressions","Clicks","Conversions","Cost","Relevance","Reason","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Out-of-Area Location"];
+  const headers = ["Search Term","Campaign Name","Ad Group Name","Impressions","Clicks","Conversions","Cost","Relevance","Reason","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Out-of-Area Location"];
   const rows = results.map((r) => [
     `"${r.searchTerm.replace(/"/g, '""')}"`,
+    r.campaignName ? `"${r.campaignName.replace(/"/g, '""')}"` : "",
+    r.adGroupName ? `"${r.adGroupName.replace(/"/g, '""')}"` : "",
     r.impressions ?? "",
     r.clicks ?? "",
     r.conversions ?? "",

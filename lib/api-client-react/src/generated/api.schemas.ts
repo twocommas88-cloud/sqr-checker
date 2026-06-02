@@ -33,6 +33,11 @@ export interface RuleSet {
      * @nullable
      */
   targetLocations?: string | null;
+  /**
+     * Saved brand terms that should always be considered relevant
+     * @nullable
+     */
+  relevantBrandTerms?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,6 +55,8 @@ export interface RuleSetInput {
   landingPageUrl?: string;
   /** Target service locations to save with this account profile */
   targetLocations?: string;
+  /** Comma-separated brand names that should always be considered relevant */
+  relevantBrandTerms?: string;
 }
 
 export interface AnalysisInput {
@@ -68,6 +75,8 @@ export interface AnalysisInput {
   excludePatterns?: string[];
   customRules?: string[];
   minConversionsForNewKeyword?: number;
+  /** Comma-separated brand names that should always be considered relevant */
+  relevantBrandTerms?: string;
 }
 
 export type SearchTermResultRelevance = typeof SearchTermResultRelevance[keyof typeof SearchTermResultRelevance];
@@ -141,6 +150,11 @@ export interface Analysis {
      * @nullable
      */
   landingPageUrl?: string | null;
+  /**
+     * Brand terms that should always be considered relevant for this analysis
+     * @nullable
+     */
+  relevantBrandTerms?: string | null;
   competitorBrands?: string[];
   excludePatterns?: string[];
   customRules?: string[];
