@@ -101,7 +101,7 @@ export default function Analyze() {
             <label className="text-sm font-medium text-foreground block mb-1.5">Analysis Name</label>
             <input
               {...register("name")}
-              placeholder="e.g. Genie Junk Removal — Q2 2025"
+              placeholder="e.g. Account Name - Date Range"
               className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
               data-testid="input-analysis-name"
             />
