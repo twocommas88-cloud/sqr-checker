@@ -120,26 +120,15 @@ function extractNgrams(irrelevantTerms: string[], activeKeywords: string): strin
       .split(/\s+/)
       .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
 
-    for (let n = 1; n <= 3; n++) {
-      for (let i = 0; i <= words.length - n; i++) {
-        const ngram = words.slice(i, i + n).join(" ");
-        if (ngram.trim()) {
-          freq[ngram] = (freq[ngram] ?? 0) + 1;
-        }
-      }
+    // Unigrams only (1-word negative terms)
+    for (const word of words) {
+      freq[word] = (freq[word] ?? 0) + 1;
     }
   }
 
-  const minFreq = (ngram: string) => {
-    const wordCount = ngram.split(" ").length;
-    if (wordCount === 1) return 3;
-    if (wordCount === 2) return 2;
-    return 1;
-  };
-
   return Object.entries(freq)
     .filter(([ngram, count]) => {
-      if (count < minFreq(ngram)) return false;
+      if (count < 3) return false; // must appear in 3+ irrelevant terms
       if (conflictsWithActiveKeywords(ngram, activeKwPhrases)) return false;
       return true;
     })
@@ -494,14 +483,14 @@ export default function Results() {
           </div>
 
           <div className="px-8 mt-4 space-y-3 flex-shrink-0">
-            {/* Competitor negatives panel */}
+            {/* Competitor negatives panel — Exact Match */}
             {competitors.length > 0 && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                 <p className="text-sm font-semibold text-red-800 mb-2 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
-                  Competitor Terms — Add as Exact Match Negatives ({competitors.length})
+                  Competitor Terms — Exact Match Negatives ({competitors.length})
                 </p>
-                <p className="text-xs text-red-600/70 mb-2">Exact match format: add these as negative exact match keywords</p>
+                <p className="text-xs text-red-600/70 mb-2">Add as negative exact match keywords to block competitor navigational searches.</p>
                 <div className="flex flex-wrap gap-1.5">
                   {competitors.map((r, i) => (
                     <code key={i} className="text-xs bg-white border border-red-200 text-red-700 px-2 py-0.5 rounded font-mono" data-testid={`competitor-term-${i}`}>
@@ -512,25 +501,78 @@ export default function Results() {
               </div>
             )}
 
-            {/* N-gram negative suggestions */}
+            {/* 1-word N-gram negatives — Phrase + Exact */}
             {ngrams.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <p className="text-sm font-semibold text-amber-800 mb-1 flex items-center gap-2">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-semibold text-amber-800 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
-                  Suggested Negative N-Grams — Add as Phrase Match ({ngrams.length})
+                  Suggested 1-Word Negative Terms ({ngrams.length})
                 </p>
-                <p className="text-xs text-amber-700/70 mb-2">
-                  Phrase match format: extracted from irrelevant search terms. Review and add the ones that make sense for your campaigns.
+                <div>
+                  <p className="text-xs font-medium text-amber-700 mb-1.5">Phrase Match — blocks queries <em>containing</em> this word</p>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                    {ngrams.map((ng, i) => (
+                      <code key={i} className="text-xs bg-white border border-amber-200 text-amber-800 px-2 py-0.5 rounded font-mono" data-testid={`ngram-phrase-${i}`}>
+                        "{ng}"
+                      </code>
+                    ))}
+                  </div>
+                </div>
+                <div className="border-t border-amber-200 pt-3">
+                  <p className="text-xs font-medium text-amber-700 mb-1.5">Exact Match — blocks only this exact 1-word query</p>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                    {ngrams.map((ng, i) => (
+                      <code key={i} className="text-xs bg-white border border-amber-200 text-amber-800 px-2 py-0.5 rounded font-mono" data-testid={`ngram-exact-${i}`}>
+                        [{ng}]
+                      </code>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* All irrelevant terms — Exact Match summary */}
+            {irrelevantNonCompetitor.length > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-orange-800 mb-1 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Irrelevant Terms — Exact Match Negatives ({irrelevantNonCompetitor.length})
+                </p>
+                <p className="text-xs text-orange-700/70 mb-2">
+                  Every search term flagged Irrelevant (excluding competitors). Add as exact match negatives to block each specific query.
                 </p>
                 <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
-                  {ngrams.map((ng, i) => (
-                    <code key={i} className="text-xs bg-white border border-amber-200 text-amber-800 px-2 py-0.5 rounded font-mono" data-testid={`ngram-${i}`}>
-                      "{ng}"
+                  {irrelevantNonCompetitor.map((r, i) => (
+                    <code key={i} className="text-xs bg-white border border-orange-200 text-orange-800 px-2 py-0.5 rounded font-mono" data-testid={`irrelevant-exact-${i}`}>
+                      [{r.searchTerm}]
                     </code>
                   ))}
                 </div>
               </div>
             )}
+
+            {/* Out-of-area terms — Phrase Match */}
+            {(() => {
+              const ooa = results.filter((r) => r.outOfAreaLocation || (r.relevance === "Irrelevant" && r.reason?.toLowerCase().includes("outside target service area")));
+              return ooa.length > 0 ? (
+                <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                  <p className="text-sm font-semibold text-purple-800 mb-1 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Out-of-Area Terms — Phrase Match Negatives ({ooa.length})
+                  </p>
+                  <p className="text-xs text-purple-700/70 mb-2">
+                    Search terms flagged as outside your target service area. Add as phrase match negatives to stop paying for out-of-area clicks.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                    {ooa.map((r, i) => (
+                      <code key={i} className="text-xs bg-white border border-purple-200 text-purple-800 px-2 py-0.5 rounded font-mono" data-testid={`ooa-phrase-${i}`}>
+                        "{r.searchTerm}"
+                      </code>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
           </div>
 
           {/* Filters */}
