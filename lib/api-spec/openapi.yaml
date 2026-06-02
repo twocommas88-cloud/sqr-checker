@@ -337,6 +337,9 @@ components:
           enum: [pending, processing, completed, failed]
         ruleSetId:
           type: ["integer", "null"]
+        activeKeywords:
+          type: string
+          description: The raw active keywords string used for this analysis
         totalTerms:
           type: integer
         relevantCount:

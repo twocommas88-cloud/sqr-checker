@@ -26,11 +26,36 @@ export interface SearchTermResult {
 export interface AnalysisOptions {
   activeKeywords: string;
   searchTerms: string;
+  accountName?: string;
   competitorBrands?: string[];
   excludePatterns?: string[];
   customRules?: string[];
   minConversionsForNewKeyword?: number;
   landingPageUrl?: string | null;
+}
+
+// ── Own-brand detection ───────────────────────────────────────────────────────
+
+// Generic service/business words that are NOT brand identifiers
+const GENERIC_BUSINESS_WORDS = new Set([
+  "junk", "removal", "hauling", "service", "services", "cleaning", "movers",
+  "moving", "disposal", "waste", "trash", "rubbish", "debris", "clutter",
+  "llc", "inc", "co", "company", "group", "solutions", "pros", "team",
+  "management", "enterprises", "local", "professional", "professionals",
+]);
+
+function extractBrandTokens(name: string): string[] {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !GENERIC_BUSINESS_WORDS.has(w));
+}
+
+function isOwnBrandTerm(term: string, brandTokens: string[]): boolean {
+  if (brandTokens.length === 0) return false;
+  const termLower = term.toLowerCase();
+  return brandTokens.some((token) => termLower.includes(token));
 }
 
 // ── Parser ────────────────────────────────────────────────────────────────────
@@ -202,6 +227,10 @@ async function analyzeTermsBatch(
     ? `\nLanding page content (use to judge relevance — terms matching what this page sells are Relevant):\n"""\n${pageContext}\n"""\n`
     : "";
 
+  const ownBrandSection = options.accountName
+    ? `\nOWN BRAND: The account being analyzed is "${options.accountName}". Search terms that reference THIS account's own brand name are NOT competitors — do NOT set isCompetitor=true for them. Only set isCompetitor=true for search terms that clearly reference a DIFFERENT competing brand.\n`
+    : "";
+
   const termsJson = JSON.stringify(
     terms.map((t) => ({
       searchTerm: t.searchTerm,
@@ -216,12 +245,12 @@ async function analyzeTermsBatch(
 
 Active Keywords in this account (keyword | match type | ad group):
 ${activeKeywords || "Not provided"}
-${pageSection}
+${pageSection}${ownBrandSection}
 ${competitorList}
 ${excludeList ? excludeList + "\n" : ""}${customRulesList ? customRulesList + "\n" : ""}
 Rules:
 1. RELEVANCE: "Relevant" if the term matches the business intent (what the landing page sells, or what the active keywords target). "Irrelevant" if off-topic, navigational to another brand, or too informational with no purchase intent.
-2. COMPETITOR: isCompetitor=true if the term contains a competitor brand name — these need to be added as negatives.
+2. COMPETITOR: isCompetitor=true ONLY if the term contains a DIFFERENT competitor brand name — these need to be added as negatives. NEVER flag own-brand terms as competitors (see OWN BRAND above).
 3. ADD LEVEL: "Campaign" = broadly irrelevant to all ad groups; "Ad Group" = irrelevant to only one ad group; "None" = relevant (no negative needed).
 4. ADD AS KEYWORD: addAsKeyword=true ONLY if: relevant AND >= ${minConversions} conversions AND not already covered by an existing exact-match keyword.
 5. SUGGESTED AD GROUP: If addAsKeyword=true, suggest the best ad group from the active keywords list.
@@ -291,5 +320,19 @@ export async function analyzeSearchQueries(options: AnalysisOptions): Promise<Se
   );
 
   const batchResults = await runWithConcurrency(tasks, CONCURRENCY);
-  return batchResults.flat();
+  const allResults = batchResults.flat();
+
+  // Post-process: un-flag own-brand terms that the AI incorrectly marked as competitors
+  if (options.accountName) {
+    const brandTokens = extractBrandTokens(options.accountName);
+    if (brandTokens.length > 0) {
+      for (const r of allResults) {
+        if (r.isCompetitor && isOwnBrandTerm(r.searchTerm, brandTokens)) {
+          r.isCompetitor = false;
+        }
+      }
+    }
+  }
+
+  return allResults;
 }

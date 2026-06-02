@@ -16,6 +16,7 @@ function parseRow(row: typeof analyses.$inferSelect) {
     name: row.name,
     status: row.status as "pending" | "processing" | "completed" | "failed",
     ruleSetId: row.ruleSetId ?? null,
+    activeKeywords: row.activeKeywords,
     totalTerms: row.totalTerms,
     relevantCount: row.relevantCount,
     irrelevantCount: row.irrelevantCount,
@@ -111,6 +112,7 @@ router.post("/analyses", async (req, res): Promise<void> => {
       const results = await analyzeSearchQueries({
         activeKeywords: data.activeKeywords,
         searchTerms: data.searchTerms,
+        accountName: data.name ?? undefined,
         landingPageUrl: data.landingPageUrl ?? null,
         competitorBrands: data.competitorBrands ?? [],
         excludePatterns: data.excludePatterns ?? [],

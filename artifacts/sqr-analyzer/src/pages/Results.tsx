@@ -44,10 +44,90 @@ const STOP_WORDS = new Set([
   "it","its","i","me","my","we","our","you","your","he","she","they","their",
   "from","about","into","through","after","before","up","down","out","off","over",
   "under","get","got","go","gone","come","came","make","made","take","took",
-  "near","me","my","&","vs","vs.","vs","–","—",
+  "near","&","vs","–","—",
 ]);
 
-function extractNgrams(irrelevantTerms: string[]): string[] {
+const STATUS_WORDS = new Set(["enabled", "paused", "removed", "keyword status"]);
+const MATCH_TYPE_WORDS = new Set(["broad match", "phrase match", "exact match", "broad", "phrase", "exact"]);
+
+/**
+ * Parse the raw activeKeywords string into a set of normalized keyword phrases.
+ * Handles both:
+ *  - Simple format: one keyword per line (optionally with match type wrappers)
+ *  - Google Ads export: Status\tKeyword\tMatch type\tCampaign\tAd group
+ */
+function parseActiveKeywordPhrases(activeKeywords: string): Set<string> {
+  const kwSet = new Set<string>();
+  const lines = activeKeywords.split(/\r?\n/);
+
+  // Detect header row to find keyword column index
+  let kwColIndex = 0;
+  let hasTabFormat = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const parts = trimmed.split("\t");
+
+    if (parts.length >= 2) {
+      hasTabFormat = true;
+      const col0 = parts[0].trim().toLowerCase();
+
+      // Detect header row
+      if (col0 === "keyword status" || col0 === "status") {
+        // Find the "keyword" column
+        kwColIndex = parts.findIndex((p) => p.trim().toLowerCase() === "keyword");
+        if (kwColIndex < 0) kwColIndex = 1;
+        continue;
+      }
+
+      // Skip non-keyword rows
+      if (STATUS_WORDS.has(col0) || MATCH_TYPE_WORDS.has(col0)) {
+        // This looks like a data row — keyword is in kwColIndex (default 1 for Google Ads export)
+        const rawKw = hasTabFormat && kwColIndex === 0 ? parts[1] : parts[kwColIndex];
+        if (!rawKw) continue;
+        let kw = rawKw.trim();
+        kw = kw.replace(/^\[(.+)\]$/, "$1");
+        kw = kw.replace(/^"(.+)"$/, "$1");
+        kw = kw.replace(/\+/g, "").toLowerCase().trim();
+        if (kw.length > 1) kwSet.add(kw);
+        continue;
+      }
+    }
+
+    // Simple format: no tabs, or tab format where col0 is the keyword
+    if (!hasTabFormat || parts.length < 2) {
+      // Each line is a plain keyword (possibly with +, [], "")
+      const rawLines = trimmed.split(",");
+      for (const raw of rawLines) {
+        let kw = raw.trim();
+        kw = kw.replace(/^\[(.+)\]$/, "$1");
+        kw = kw.replace(/^"(.+)"$/, "$1");
+        kw = kw.replace(/\+/g, "").toLowerCase().trim();
+        if (kw.length > 1) kwSet.add(kw);
+      }
+    }
+  }
+
+  return kwSet;
+}
+
+/**
+ * Returns true if adding this n-gram as a phrase match negative would block
+ * any of the account's active keywords (i.e. the n-gram appears inside an active kw).
+ */
+function conflictsWithActiveKeywords(ngram: string, activeKwPhrases: Set<string>): boolean {
+  for (const kw of activeKwPhrases) {
+    // Phrase match negative "ngram" blocks any query containing the ngram.
+    // A keyword is blocked if the keyword text contains the ngram.
+    if (kw === ngram || kw.includes(ngram)) return true;
+  }
+  return false;
+}
+
+function extractNgrams(irrelevantTerms: string[], activeKeywords: string): string[] {
+  const activeKwPhrases = parseActiveKeywordPhrases(activeKeywords);
   const freq: Record<string, number> = {};
 
   for (const term of irrelevantTerms) {
@@ -57,7 +137,6 @@ function extractNgrams(irrelevantTerms: string[]): string[] {
       .split(/\s+/)
       .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
 
-    // 1-grams, 2-grams, 3-grams
     for (let n = 1; n <= 3; n++) {
       for (let i = 0; i <= words.length - n; i++) {
         const ngram = words.slice(i, i + n).join(" ");
@@ -68,9 +147,21 @@ function extractNgrams(irrelevantTerms: string[]): string[] {
     }
   }
 
-  // Sort by frequency desc, then alphabetically; return phrases with freq >= 1
+  // Minimum frequency thresholds by n-gram size to cut noise
+  const minFreq = (ngram: string) => {
+    const wordCount = ngram.split(" ").length;
+    if (wordCount === 1) return 3; // single words: must appear in 3+ irrelevant terms
+    if (wordCount === 2) return 2; // bigrams: 2+
+    return 1;                      // trigrams: 1+
+  };
+
   return Object.entries(freq)
-    .filter(([, count]) => count >= 1)
+    .filter(([ngram, count]) => {
+      if (count < minFreq(ngram)) return false;
+      // Drop any n-gram that would block an active keyword
+      if (conflictsWithActiveKeywords(ngram, activeKwPhrases)) return false;
+      return true;
+    })
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([ngram]) => ngram);
 }
@@ -156,8 +247,12 @@ export default function Results() {
   const irrelevantNonCompetitor = results.filter((r) => r.relevance === "Irrelevant" && !r.isCompetitor);
 
   const ngrams = useMemo(
-    () => extractNgrams(irrelevantNonCompetitor.map((r) => r.searchTerm)),
-    [irrelevantNonCompetitor.length]
+    () => extractNgrams(
+      irrelevantNonCompetitor.map((r) => r.searchTerm),
+      analysis?.activeKeywords ?? ""
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [irrelevantNonCompetitor.length, analysis?.activeKeywords]
   );
 
   function handleDelete() {

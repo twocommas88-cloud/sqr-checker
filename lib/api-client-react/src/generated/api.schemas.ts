@@ -101,6 +101,8 @@ export interface Analysis {
   status: AnalysisStatus;
   /** @nullable */
   ruleSetId?: number | null;
+  /** The raw active keywords string used for this analysis */
+  activeKeywords?: string;
   totalTerms?: number;
   relevantCount?: number;
   irrelevantCount?: number;

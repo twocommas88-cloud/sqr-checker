@@ -158,6 +158,7 @@ export const GetAnalysisResponse = zod.object({
   "name": zod.string(),
   "status": zod.enum(['pending', 'processing', 'completed', 'failed']),
   "ruleSetId": zod.number().nullish(),
+  "activeKeywords": zod.string().optional().describe('The raw active keywords string used for this analysis'),
   "totalTerms": zod.number().optional(),
   "relevantCount": zod.number().optional(),
   "irrelevantCount": zod.number().optional(),
