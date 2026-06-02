@@ -233,6 +233,15 @@ components:
             type: string
         minConversionsForNewKeyword:
           type: integer
+        activeKeywords:
+          type: ["string", "null"]
+          description: Saved active keywords for this account profile
+        landingPageUrl:
+          type: ["string", "null"]
+          description: Saved landing page URL for this account profile
+        targetLocations:
+          type: ["string", "null"]
+          description: Saved target service locations for this account profile
         createdAt:
           type: string
         updatedAt:
@@ -260,6 +269,15 @@ components:
             type: string
         minConversionsForNewKeyword:
           type: integer
+        activeKeywords:
+          type: string
+          description: Active keywords to save with this account profile
+        landingPageUrl:
+          type: string
+          description: Landing page URL to save with this account profile
+        targetLocations:
+          type: string
+          description: Target service locations to save with this account profile
 
     AnalysisInput:
       type: object
@@ -326,6 +344,9 @@ components:
           type: boolean
         matchedKeyword:
           type: ["string", "null"]
+        outOfAreaLocation:
+          type: ["string", "null"]
+          description: The specific location word/phrase in the search term that is outside the target service area
 
     Analysis:
       type: object
@@ -346,6 +367,23 @@ components:
         targetLocations:
           type: ["string", "null"]
           description: Target service locations used for this analysis
+        landingPageUrl:
+          type: ["string", "null"]
+          description: Landing page URL used for this analysis
+        competitorBrands:
+          type: array
+          items:
+            type: string
+        excludePatterns:
+          type: array
+          items:
+            type: string
+        customRules:
+          type: array
+          items:
+            type: string
+        minConversionsForNewKeyword:
+          type: integer
         totalTerms:
           type: integer
         relevantCount:

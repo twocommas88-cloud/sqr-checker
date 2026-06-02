@@ -11,17 +11,23 @@ import {
 
 const router: IRouter = Router();
 
-router.get("/rules", async (req, res): Promise<void> => {
-  const rows = await db.select().from(ruleSets).orderBy(ruleSets.createdAt);
-  const result = rows.map((r) => ({
+function serializeRuleSet(r: typeof ruleSets.$inferSelect) {
+  return {
     ...r,
     competitorBrands: JSON.parse(r.competitorBrands) as string[],
     excludePatterns: JSON.parse(r.excludePatterns) as string[],
     customRules: JSON.parse(r.customRules) as string[],
+    activeKeywords: r.activeKeywords ?? null,
+    landingPageUrl: r.landingPageUrl ?? null,
+    targetLocations: r.targetLocations ?? null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
-  }));
-  res.json(result);
+  };
+}
+
+router.get("/rules", async (req, res): Promise<void> => {
+  const rows = await db.select().from(ruleSets).orderBy(ruleSets.createdAt);
+  res.json(rows.map(serializeRuleSet));
 });
 
 router.post("/rules", async (req, res): Promise<void> => {
@@ -39,16 +45,12 @@ router.post("/rules", async (req, res): Promise<void> => {
       excludePatterns: JSON.stringify(excludePatterns ?? []),
       customRules: JSON.stringify(customRules ?? []),
       minConversionsForNewKeyword: rest.minConversionsForNewKeyword ?? 1,
+      activeKeywords: rest.activeKeywords ?? null,
+      landingPageUrl: rest.landingPageUrl ?? null,
+      targetLocations: rest.targetLocations ?? null,
     })
     .returning();
-  res.status(201).json({
-    ...row,
-    competitorBrands: JSON.parse(row.competitorBrands) as string[],
-    excludePatterns: JSON.parse(row.excludePatterns) as string[],
-    customRules: JSON.parse(row.customRules) as string[],
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  });
+  res.status(201).json(serializeRuleSet(row));
 });
 
 router.get("/rules/:id", async (req, res): Promise<void> => {
@@ -62,14 +64,7 @@ router.get("/rules/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Rule set not found" });
     return;
   }
-  res.json({
-    ...row,
-    competitorBrands: JSON.parse(row.competitorBrands) as string[],
-    excludePatterns: JSON.parse(row.excludePatterns) as string[],
-    customRules: JSON.parse(row.customRules) as string[],
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  });
+  res.json(serializeRuleSet(row));
 });
 
 router.put("/rules/:id", async (req, res): Promise<void> => {
@@ -99,14 +94,7 @@ router.put("/rules/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Rule set not found" });
     return;
   }
-  res.json({
-    ...row,
-    competitorBrands: JSON.parse(row.competitorBrands) as string[],
-    excludePatterns: JSON.parse(row.excludePatterns) as string[],
-    customRules: JSON.parse(row.customRules) as string[],
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  });
+  res.json(serializeRuleSet(row));
 });
 
 router.delete("/rules/:id", async (req, res): Promise<void> => {

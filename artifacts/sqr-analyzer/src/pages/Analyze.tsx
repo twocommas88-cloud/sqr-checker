@@ -51,6 +51,9 @@ export default function Analyze() {
         setExcludePatterns(rs.excludePatterns ?? []);
         setValue("minConversionsForNewKeyword", rs.minConversionsForNewKeyword ?? 1);
         setValue("customRules", (rs.customRules ?? []).join("\n"));
+        if (rs.activeKeywords) setValue("activeKeywords", rs.activeKeywords);
+        if (rs.landingPageUrl) setValue("landingPageUrl", rs.landingPageUrl);
+        if (rs.targetLocations) setValue("targetLocations", rs.targetLocations);
       }
     }
   }
@@ -104,18 +107,25 @@ export default function Analyze() {
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground block mb-1.5">Load Rule Set (optional)</label>
+            <label className="text-sm font-medium text-foreground block mb-1.5">
+              Load Account Profile <span className="text-muted-foreground font-normal">(optional — pre-fills all fields)</span>
+            </label>
             <select
               value={selectedRuleSetId}
               onChange={(e) => handleRuleSetChange(e.target.value)}
               className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
               data-testid="select-rule-set"
             >
-              <option value="">Custom / Ad-hoc rules</option>
+              <option value="">No profile / start fresh</option>
               {ruleSets?.map((rs) => (
                 <option key={rs.id} value={String(rs.id)}>{rs.name}{rs.accountName ? ` — ${rs.accountName}` : ""}</option>
               ))}
             </select>
+            {selectedRuleSetId && (
+              <p className="text-xs text-primary mt-1">
+                ✓ Profile loaded — only paste new Search Terms below, everything else is pre-filled.
+              </p>
+            )}
           </div>
         </div>
 

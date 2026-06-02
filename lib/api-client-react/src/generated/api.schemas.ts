@@ -18,6 +18,21 @@ export interface RuleSet {
   excludePatterns?: string[];
   customRules?: string[];
   minConversionsForNewKeyword?: number;
+  /**
+     * Saved active keywords for this account profile
+     * @nullable
+     */
+  activeKeywords?: string | null;
+  /**
+     * Saved landing page URL for this account profile
+     * @nullable
+     */
+  landingPageUrl?: string | null;
+  /**
+     * Saved target service locations for this account profile
+     * @nullable
+     */
+  targetLocations?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -29,6 +44,12 @@ export interface RuleSetInput {
   excludePatterns?: string[];
   customRules?: string[];
   minConversionsForNewKeyword?: number;
+  /** Active keywords to save with this account profile */
+  activeKeywords?: string;
+  /** Landing page URL to save with this account profile */
+  landingPageUrl?: string;
+  /** Target service locations to save with this account profile */
+  targetLocations?: string;
 }
 
 export interface AnalysisInput {
@@ -85,6 +106,11 @@ export interface SearchTermResult {
   isCompetitor: boolean;
   /** @nullable */
   matchedKeyword?: string | null;
+  /**
+     * The specific location word/phrase in the search term that is outside the target service area
+     * @nullable
+     */
+  outOfAreaLocation?: string | null;
 }
 
 export type AnalysisStatus = typeof AnalysisStatus[keyof typeof AnalysisStatus];
@@ -110,6 +136,15 @@ export interface Analysis {
      * @nullable
      */
   targetLocations?: string | null;
+  /**
+     * Landing page URL used for this analysis
+     * @nullable
+     */
+  landingPageUrl?: string | null;
+  competitorBrands?: string[];
+  excludePatterns?: string[];
+  customRules?: string[];
+  minConversionsForNewKeyword?: number;
   totalTerms?: number;
   relevantCount?: number;
   irrelevantCount?: number;

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db, analyses } from "@workspace/db";
 import {
   CreateAnalysisBody,
@@ -18,6 +18,11 @@ function parseRow(row: typeof analyses.$inferSelect) {
     ruleSetId: row.ruleSetId ?? null,
     activeKeywords: row.activeKeywords,
     targetLocations: row.targetLocations ?? null,
+    landingPageUrl: row.landingPageUrl ?? null,
+    competitorBrands: JSON.parse(row.competitorBrands) as string[],
+    excludePatterns: JSON.parse(row.excludePatterns) as string[],
+    customRules: JSON.parse(row.customRules) as string[],
+    minConversionsForNewKeyword: row.minConversionsForNewKeyword,
     totalTerms: row.totalTerms,
     relevantCount: row.relevantCount,
     irrelevantCount: row.irrelevantCount,
@@ -53,7 +58,6 @@ router.get("/analyses/stats", async (req, res): Promise<void> => {
       ? rows.reduce((sum, r) => sum + r.relevantCount, 0) / totalTermsAnalyzed
       : 0;
 
-  // Collect all competitor terms across all analyses
   const competitorCounts: Record<string, number> = {};
   for (const row of rows) {
     const results = JSON.parse(row.results) as Array<{ isCompetitor: boolean; searchTerm: string }>;
@@ -87,7 +91,6 @@ router.post("/analyses", async (req, res): Promise<void> => {
   const data = parsed.data;
   const name = data.name ?? `Analysis ${new Date().toLocaleDateString()}`;
 
-  // Create the record immediately in "processing" state
   const [row] = await db
     .insert(analyses)
     .values({
@@ -97,6 +100,7 @@ router.post("/analyses", async (req, res): Promise<void> => {
       activeKeywords: data.activeKeywords,
       searchTerms: data.searchTerms,
       landingPageUrl: data.landingPageUrl ?? null,
+      targetLocations: data.targetLocations ?? null,
       competitorBrands: JSON.stringify(data.competitorBrands ?? []),
       excludePatterns: JSON.stringify(data.excludePatterns ?? []),
       customRules: JSON.stringify(data.customRules ?? []),
@@ -104,10 +108,8 @@ router.post("/analyses", async (req, res): Promise<void> => {
     })
     .returning();
 
-  // Return immediately with the processing record
   res.status(201).json(parseRow(row));
 
-  // Run analysis in background (don't await in handler)
   (async () => {
     try {
       const results = await analyzeSearchQueries({

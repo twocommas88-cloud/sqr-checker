@@ -21,6 +21,15 @@ export interface Analysis {
      * @nullable
      */
   targetLocations?: string | null;
+  /**
+     * Landing page URL used for this analysis
+     * @nullable
+     */
+  landingPageUrl?: string | null;
+  competitorBrands?: string[];
+  excludePatterns?: string[];
+  customRules?: string[];
+  minConversionsForNewKeyword?: number;
   totalTerms?: number;
   relevantCount?: number;
   irrelevantCount?: number;

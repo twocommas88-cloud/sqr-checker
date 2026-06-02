@@ -21,6 +21,7 @@ export interface SearchTermResult {
   suggestedAdGroup?: string | null;
   isCompetitor: boolean;
   matchedKeyword?: string | null;
+  outOfAreaLocation?: string | null;
 }
 
 export interface AnalysisOptions {
@@ -276,7 +277,9 @@ Search terms to analyze:
 ${termsJson}
 
 Return ONLY a valid JSON array with exactly ${terms.length} objects, one per search term, in this exact format — no markdown, no explanation:
-[{"searchTerm":"...","relevance":"Relevant","reason":"...","addLevel":"None","addAsKeyword":false,"suggestedAdGroup":null,"isCompetitor":false,"matchedKeyword":"..."}]`;
+[{"searchTerm":"...","relevance":"Relevant","reason":"...","addLevel":"None","addAsKeyword":false,"suggestedAdGroup":null,"isCompetitor":false,"matchedKeyword":"...","outOfAreaLocation":null}]
+
+outOfAreaLocation: If the term is flagged as outside the target service area, set this to the specific location word or phrase found in the search term that is NOT in the target locations list (e.g. "lewisburg", "nashville"). Otherwise null.`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4.1-mini",
@@ -297,6 +300,7 @@ Return ONLY a valid JSON array with exactly ${terms.length} objects, one per sea
     suggestedAdGroup: string | null;
     isCompetitor: boolean;
     matchedKeyword: string | null;
+    outOfAreaLocation: string | null;
   }>;
 
   return parsed.map((item, i) => ({
@@ -309,6 +313,7 @@ Return ONLY a valid JSON array with exactly ${terms.length} objects, one per sea
     suggestedAdGroup: item.suggestedAdGroup ?? null,
     isCompetitor: item.isCompetitor ?? false,
     matchedKeyword: item.matchedKeyword ?? null,
+    outOfAreaLocation: item.outOfAreaLocation ?? null,
   }));
 }
 

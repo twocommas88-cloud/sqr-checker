@@ -15,6 +15,21 @@ export interface RuleSet {
   excludePatterns?: string[];
   customRules?: string[];
   minConversionsForNewKeyword?: number;
+  /**
+     * Saved active keywords for this account profile
+     * @nullable
+     */
+  activeKeywords?: string | null;
+  /**
+     * Saved landing page URL for this account profile
+     * @nullable
+     */
+  landingPageUrl?: string | null;
+  /**
+     * Saved target service locations for this account profile
+     * @nullable
+     */
+  targetLocations?: string | null;
   createdAt: string;
   updatedAt: string;
 }

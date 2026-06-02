@@ -28,6 +28,9 @@ export const ListRulesResponseItem = zod.object({
   "excludePatterns": zod.array(zod.string()).optional(),
   "customRules": zod.array(zod.string()).optional(),
   "minConversionsForNewKeyword": zod.number().optional(),
+  "activeKeywords": zod.string().nullish().describe('Saved active keywords for this account profile'),
+  "landingPageUrl": zod.string().nullish().describe('Saved landing page URL for this account profile'),
+  "targetLocations": zod.string().nullish().describe('Saved target service locations for this account profile'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -43,7 +46,10 @@ export const CreateRuleSetBody = zod.object({
   "competitorBrands": zod.array(zod.string()).optional(),
   "excludePatterns": zod.array(zod.string()).optional(),
   "customRules": zod.array(zod.string()).optional(),
-  "minConversionsForNewKeyword": zod.number().optional()
+  "minConversionsForNewKeyword": zod.number().optional(),
+  "activeKeywords": zod.string().optional().describe('Active keywords to save with this account profile'),
+  "landingPageUrl": zod.string().optional().describe('Landing page URL to save with this account profile'),
+  "targetLocations": zod.string().optional().describe('Target service locations to save with this account profile')
 })
 
 
@@ -62,6 +68,9 @@ export const GetRuleSetResponse = zod.object({
   "excludePatterns": zod.array(zod.string()).optional(),
   "customRules": zod.array(zod.string()).optional(),
   "minConversionsForNewKeyword": zod.number().optional(),
+  "activeKeywords": zod.string().nullish().describe('Saved active keywords for this account profile'),
+  "landingPageUrl": zod.string().nullish().describe('Saved landing page URL for this account profile'),
+  "targetLocations": zod.string().nullish().describe('Saved target service locations for this account profile'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -80,7 +89,10 @@ export const UpdateRuleSetBody = zod.object({
   "competitorBrands": zod.array(zod.string()).optional(),
   "excludePatterns": zod.array(zod.string()).optional(),
   "customRules": zod.array(zod.string()).optional(),
-  "minConversionsForNewKeyword": zod.number().optional()
+  "minConversionsForNewKeyword": zod.number().optional(),
+  "activeKeywords": zod.string().optional().describe('Active keywords to save with this account profile'),
+  "landingPageUrl": zod.string().optional().describe('Landing page URL to save with this account profile'),
+  "targetLocations": zod.string().optional().describe('Target service locations to save with this account profile')
 })
 
 export const UpdateRuleSetResponse = zod.object({
@@ -91,6 +103,9 @@ export const UpdateRuleSetResponse = zod.object({
   "excludePatterns": zod.array(zod.string()).optional(),
   "customRules": zod.array(zod.string()).optional(),
   "minConversionsForNewKeyword": zod.number().optional(),
+  "activeKeywords": zod.string().nullish().describe('Saved active keywords for this account profile'),
+  "landingPageUrl": zod.string().nullish().describe('Saved landing page URL for this account profile'),
+  "targetLocations": zod.string().nullish().describe('Saved target service locations for this account profile'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -161,6 +176,11 @@ export const GetAnalysisResponse = zod.object({
   "ruleSetId": zod.number().nullish(),
   "activeKeywords": zod.string().optional().describe('The raw active keywords string used for this analysis'),
   "targetLocations": zod.string().nullish().describe('Target service locations used for this analysis'),
+  "landingPageUrl": zod.string().nullish().describe('Landing page URL used for this analysis'),
+  "competitorBrands": zod.array(zod.string()).optional(),
+  "excludePatterns": zod.array(zod.string()).optional(),
+  "customRules": zod.array(zod.string()).optional(),
+  "minConversionsForNewKeyword": zod.number().optional(),
   "totalTerms": zod.number().optional(),
   "relevantCount": zod.number().optional(),
   "irrelevantCount": zod.number().optional(),
@@ -178,7 +198,8 @@ export const GetAnalysisResponse = zod.object({
   "addAsKeyword": zod.boolean(),
   "suggestedAdGroup": zod.string().nullable(),
   "isCompetitor": zod.boolean(),
-  "matchedKeyword": zod.string().nullish()
+  "matchedKeyword": zod.string().nullish(),
+  "outOfAreaLocation": zod.string().nullish().describe('The specific location word\/phrase in the search term that is outside the target service area')
 })),
   "errorMessage": zod.string().nullish(),
   "createdAt": zod.string()

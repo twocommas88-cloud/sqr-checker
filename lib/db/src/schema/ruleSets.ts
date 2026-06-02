@@ -10,6 +10,9 @@ export const ruleSets = pgTable("rule_sets", {
   excludePatterns: text("exclude_patterns").notNull().default("[]"),
   customRules: text("custom_rules").notNull().default("[]"),
   minConversionsForNewKeyword: integer("min_conversions_for_new_keyword").notNull().default(1),
+  activeKeywords: text("active_keywords"),
+  landingPageUrl: text("landing_page_url"),
+  targetLocations: text("target_locations"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

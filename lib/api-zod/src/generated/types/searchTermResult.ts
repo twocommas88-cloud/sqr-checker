@@ -27,4 +27,9 @@ export interface SearchTermResult {
   isCompetitor: boolean;
   /** @nullable */
   matchedKeyword?: string | null;
+  /**
+     * The specific location word/phrase in the search term that is outside the target service area
+     * @nullable
+     */
+  outOfAreaLocation?: string | null;
 }

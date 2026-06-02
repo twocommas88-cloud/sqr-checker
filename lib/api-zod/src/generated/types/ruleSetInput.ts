@@ -13,4 +13,10 @@ export interface RuleSetInput {
   excludePatterns?: string[];
   customRules?: string[];
   minConversionsForNewKeyword?: number;
+  /** Active keywords to save with this account profile */
+  activeKeywords?: string;
+  /** Landing page URL to save with this account profile */
+  landingPageUrl?: string;
+  /** Target service locations to save with this account profile */
+  targetLocations?: string;
 }
