@@ -9,6 +9,7 @@ import { Loader2, ChevronDown, ChevronUp } from "lucide-react";
 interface FormData {
   name: string;
   landingPageUrl: string;
+  targetLocations: string;
   activeKeywords: string;
   searchTerms: string;
   ruleSetId: string;
@@ -30,6 +31,7 @@ export default function Analyze() {
     defaultValues: {
       name: "",
       landingPageUrl: "",
+      targetLocations: "",
       activeKeywords: "",
       searchTerms: "",
       ruleSetId: "",
@@ -62,6 +64,7 @@ export default function Analyze() {
       data: {
         name: data.name || `Analysis ${new Date().toLocaleDateString()}`,
         landingPageUrl: data.landingPageUrl || undefined,
+        targetLocations: data.targetLocations || undefined,
         activeKeywords: data.activeKeywords,
         searchTerms: data.searchTerms,
         ruleSetId: data.ruleSetId ? parseInt(data.ruleSetId) : null,
@@ -95,7 +98,7 @@ export default function Analyze() {
             <label className="text-sm font-medium text-foreground block mb-1.5">Analysis Name</label>
             <input
               {...register("name")}
-              placeholder="e.g. Brand Campaign Q2 2025"
+              placeholder="e.g. Genie Junk Removal — Q2 2025"
               className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
               data-testid="input-analysis-name"
             />
@@ -116,21 +119,38 @@ export default function Analyze() {
           </div>
         </div>
 
-        {/* Landing Page URL */}
-        <div className="bg-accent/40 border border-accent rounded-xl px-5 py-4">
-          <label className="text-sm font-medium text-foreground block mb-1">
-            Landing Page URL <span className="text-muted-foreground font-normal">(optional — AI will scan your site to determine relevance)</span>
-          </label>
-          <p className="text-xs text-muted-foreground mb-2">
-            Paste your website or landing page URL. The AI will read your page content to understand what your business offers and judge each search term against it.
-          </p>
-          <input
-            {...register("landingPageUrl")}
-            type="url"
-            placeholder="https://www.yourwebsite.com"
-            className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-            data-testid="input-landing-page-url"
-          />
+        {/* Landing Page URL + Target Locations */}
+        <div className="bg-accent/40 border border-accent rounded-xl px-5 py-4 space-y-4">
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1">
+              Landing Page URL <span className="text-muted-foreground font-normal">(optional — AI will scan your site for context)</span>
+            </label>
+            <p className="text-xs text-muted-foreground mb-2">
+              The AI reads your page to understand what you offer and judges each search term against it.
+            </p>
+            <input
+              {...register("landingPageUrl")}
+              type="url"
+              placeholder="https://www.yourwebsite.com"
+              className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              data-testid="input-landing-page-url"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1">
+              Target Locations <span className="text-muted-foreground font-normal">(optional — helps flag out-of-area searches)</span>
+            </label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Enter the cities, regions, or areas you serve. Searches mentioning locations outside this list will be marked irrelevant.
+            </p>
+            <input
+              {...register("targetLocations")}
+              placeholder="e.g. Dallas, Frisco, McKinney, Allen, Plano, DFW, Texas"
+              className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              data-testid="input-target-locations"
+            />
+          </div>
         </div>
 
         {/* Keywords and Terms */}
@@ -138,11 +158,11 @@ export default function Analyze() {
           <div>
             <label className="text-sm font-medium text-foreground block mb-1">Active Keywords</label>
             <p className="text-xs text-muted-foreground mb-2">
-              One keyword per line. Format: <code className="bg-muted px-1 rounded text-xs">keyword | match type | Ad Group Name</code>
+              Paste from Google Ads — full export or one keyword per line with match type and ad group.
             </p>
             <textarea
               {...register("activeKeywords", { required: true })}
-              rows={10}
+              rows={12}
               placeholder={"running shoes | exact | Running Shoes\nbuy sneakers online | phrase | General\nsport footwear | broad | General"}
               className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-ring resize-y"
               data-testid="textarea-active-keywords"
@@ -152,11 +172,11 @@ export default function Analyze() {
           <div>
             <label className="text-sm font-medium text-foreground block mb-1">Search Terms to Analyze</label>
             <p className="text-xs text-muted-foreground mb-2">
-              Paste from Google Ads report. Columns: <code className="bg-muted px-1 rounded text-xs">term, impressions, clicks, conversions, cost</code>
+              Paste from Google Ads Search Terms report. Full export format is supported.
             </p>
             <textarea
               {...register("searchTerms", { required: true })}
-              rows={10}
+              rows={12}
               placeholder={"running shoes for men\t1200\t84\t5\t42.50\nbuy nike shoes online\t340\t21\t0\t8.20\nbest running shoe brand\t220\t15\t2\t12.00"}
               className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-ring resize-y"
               data-testid="textarea-search-terms"

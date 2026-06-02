@@ -37,6 +37,8 @@ export interface AnalysisInput {
   ruleSetId?: number | null;
   /** Optional URL of the landing page/website to scan for relevance context */
   landingPageUrl?: string;
+  /** Optional comma-separated target service locations (cities, regions). Terms outside these areas will be flagged as irrelevant. */
+  targetLocations?: string;
   /** Newline or comma separated list of active keywords with their match types and ad groups */
   activeKeywords: string;
   /** Newline or tab-separated search term data (term, impressions, clicks, conversions, cost) */
@@ -103,6 +105,11 @@ export interface Analysis {
   ruleSetId?: number | null;
   /** The raw active keywords string used for this analysis */
   activeKeywords?: string;
+  /**
+     * Target service locations used for this analysis
+     * @nullable
+     */
+  targetLocations?: string | null;
   totalTerms?: number;
   relevantCount?: number;
   irrelevantCount?: number;

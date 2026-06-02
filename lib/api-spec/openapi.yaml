@@ -272,6 +272,9 @@ components:
         landingPageUrl:
           type: string
           description: Optional URL of the landing page/website to scan for relevance context
+        targetLocations:
+          type: string
+          description: Optional comma-separated target service locations (cities, regions). Terms outside these areas will be flagged as irrelevant.
         activeKeywords:
           type: string
           description: Newline or comma separated list of active keywords with their match types and ad groups
@@ -340,6 +343,9 @@ components:
         activeKeywords:
           type: string
           description: The raw active keywords string used for this analysis
+        targetLocations:
+          type: ["string", "null"]
+          description: Target service locations used for this analysis
         totalTerms:
           type: integer
         relevantCount:

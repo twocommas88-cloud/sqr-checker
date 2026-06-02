@@ -27,6 +27,7 @@ export interface AnalysisOptions {
   activeKeywords: string;
   searchTerms: string;
   accountName?: string;
+  targetLocations?: string | null;
   competitorBrands?: string[];
   excludePatterns?: string[];
   customRules?: string[];
@@ -231,6 +232,13 @@ async function analyzeTermsBatch(
     ? `\nOWN BRAND: The account being analyzed is "${options.accountName}". Search terms that reference THIS account's own brand name are NOT competitors — do NOT set isCompetitor=true for them. Only set isCompetitor=true for search terms that clearly reference a DIFFERENT competing brand.\n`
     : "";
 
+  const locationSection = options.targetLocations?.trim()
+    ? `\nTARGET SERVICE LOCATIONS: ${options.targetLocations.trim()}
+- Search terms that mention a specific location NOT in this list → Irrelevant (addLevel: "Campaign"), reason: "Outside target service area"
+- Search terms with no location or a location IN this list → treat as geographically relevant (location alone does not make a term irrelevant)
+- Generic location terms (e.g. "near me", "local") → geographically relevant\n`
+    : "";
+
   const termsJson = JSON.stringify(
     terms.map((t) => ({
       searchTerm: t.searchTerm,
@@ -245,13 +253,20 @@ async function analyzeTermsBatch(
 
 Active Keywords in this account (keyword | match type | ad group):
 ${activeKeywords || "Not provided"}
-${pageSection}${ownBrandSection}
+${pageSection}${ownBrandSection}${locationSection}
 ${competitorList}
 ${excludeList ? excludeList + "\n" : ""}${customRulesList ? customRulesList + "\n" : ""}
+RELEVANCE PHILOSOPHY — READ CAREFULLY:
+- The active keywords above define what this business offers. Any search term that is semantically related to those keywords — even if broad, generic, or short — is RELEVANT.
+- Broad service terms ARE relevant. Example: if the business does "junk removal", then "junk", "hauling", "pickup", "pick up", "mattress disposal" are ALL relevant — they represent people looking for the service.
+- Do NOT mark terms irrelevant just because they are short, broad, or high-funnel. Broad terms that match the service category are still potential customers.
+- Mark Irrelevant ONLY when the term is: (1) clearly a different industry/service, (2) navigating to a competitor brand, (3) outside the target service area, (4) explicitly excluded by rules below, or (5) purely informational with zero commercial intent (e.g. "what is junk removal" — but even then be conservative).
+- When in doubt, lean Relevant.
+
 Rules:
-1. RELEVANCE: "Relevant" if the term matches the business intent (what the landing page sells, or what the active keywords target). "Irrelevant" if off-topic, navigational to another brand, or too informational with no purchase intent.
+1. RELEVANCE: Apply the philosophy above. Use active keywords + landing page content as the primary signal.
 2. COMPETITOR: isCompetitor=true ONLY if the term contains a DIFFERENT competitor brand name — these need to be added as negatives. NEVER flag own-brand terms as competitors (see OWN BRAND above).
-3. ADD LEVEL: "Campaign" = broadly irrelevant to all ad groups; "Ad Group" = irrelevant to only one ad group; "None" = relevant (no negative needed).
+3. ADD LEVEL: "Campaign" = broadly irrelevant to all ad groups; "Ad Group" = irrelevant only to one specific ad group; "None" = relevant (no negative needed).
 4. ADD AS KEYWORD: addAsKeyword=true ONLY if: relevant AND >= ${minConversions} conversions AND not already covered by an existing exact-match keyword.
 5. SUGGESTED AD GROUP: If addAsKeyword=true, suggest the best ad group from the active keywords list.
 6. MATCHED KEYWORD: The active keyword this search term matched or is closest to.

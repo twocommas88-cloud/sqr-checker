@@ -429,7 +429,7 @@ export default function Results() {
               <table className="w-full text-sm min-w-[1100px]">
                 <thead className="bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   <tr>
-                    <th className="text-left px-4 py-3 w-[200px]">Search Term</th>
+                    <th className="text-left px-4 py-3 w-[300px] min-w-[260px]">Search Term</th>
                     <th className="text-right px-3 py-3 w-[80px]">Impr.</th>
                     <th className="text-right px-3 py-3 w-[65px]">Clicks</th>
                     <th className="text-right px-3 py-3 w-[70px]">Conv.</th>
@@ -447,8 +447,8 @@ export default function Results() {
                     <tr><td colSpan={11} className="px-4 py-10 text-center text-muted-foreground text-sm">No results match your filters</td></tr>
                   ) : filtered.map((r, i) => (
                     <tr key={i} className="hover:bg-muted/20 transition-colors" data-testid={`row-result-${i}`}>
-                      <td className="px-4 py-2.5 font-medium text-foreground max-w-[200px]">
-                        <span className="truncate block" title={r.searchTerm}>{r.searchTerm}</span>
+                      <td className="px-4 py-2.5 font-medium text-foreground w-[300px] min-w-[260px]">
+                        <span className="break-words block" title={r.searchTerm}>{r.searchTerm}</span>
                         {r.matchedKeyword && (
                           <span className="text-xs text-muted-foreground truncate block" title={r.matchedKeyword}>→ {r.matchedKeyword}</span>
                         )}
