@@ -254,6 +254,9 @@ components:
           type: string
         ruleSetId:
           type: ["integer", "null"]
+        landingPageUrl:
+          type: string
+          description: Optional URL of the landing page/website to scan for relevance context
         activeKeywords:
           type: string
           description: Newline or comma separated list of active keywords with their match types and ad groups

@@ -128,6 +128,7 @@ export const ListAnalysesResponse = zod.array(ListAnalysesResponseItem)
 export const CreateAnalysisBody = zod.object({
   "name": zod.string().optional(),
   "ruleSetId": zod.number().nullish(),
+  "landingPageUrl": zod.string().optional().describe('Optional URL of the landing page\/website to scan for relevance context'),
   "activeKeywords": zod.string().describe('Newline or comma separated list of active keywords with their match types and ad groups'),
   "searchTerms": zod.string().describe('Newline or tab-separated search term data (term, impressions, clicks, conversions, cost)'),
   "competitorBrands": zod.array(zod.string()).optional(),

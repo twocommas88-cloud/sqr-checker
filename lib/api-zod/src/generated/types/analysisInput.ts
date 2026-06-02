@@ -10,6 +10,8 @@ export interface AnalysisInput {
   name?: string;
   /** @nullable */
   ruleSetId?: number | null;
+  /** Optional URL of the landing page/website to scan for relevance context */
+  landingPageUrl?: string;
   /** Newline or comma separated list of active keywords with their match types and ad groups */
   activeKeywords: string;
   /** Newline or tab-separated search term data (term, impressions, clicks, conversions, cost) */

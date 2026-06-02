@@ -8,6 +8,7 @@ import { Loader2, ChevronDown, ChevronUp } from "lucide-react";
 
 interface FormData {
   name: string;
+  landingPageUrl: string;
   activeKeywords: string;
   searchTerms: string;
   ruleSetId: string;
@@ -28,6 +29,7 @@ export default function Analyze() {
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       name: "",
+      landingPageUrl: "",
       activeKeywords: "",
       searchTerms: "",
       ruleSetId: "",
@@ -59,6 +61,7 @@ export default function Analyze() {
     createAnalysis.mutate({
       data: {
         name: data.name || `Analysis ${new Date().toLocaleDateString()}`,
+        landingPageUrl: data.landingPageUrl || undefined,
         activeKeywords: data.activeKeywords,
         searchTerms: data.searchTerms,
         ruleSetId: data.ruleSetId ? parseInt(data.ruleSetId) : null,
@@ -111,6 +114,23 @@ export default function Analyze() {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Landing Page URL */}
+        <div className="bg-accent/40 border border-accent rounded-xl px-5 py-4">
+          <label className="text-sm font-medium text-foreground block mb-1">
+            Landing Page URL <span className="text-muted-foreground font-normal">(optional — AI will scan your site to determine relevance)</span>
+          </label>
+          <p className="text-xs text-muted-foreground mb-2">
+            Paste your website or landing page URL. The AI will read your page content to understand what your business offers and judge each search term against it.
+          </p>
+          <input
+            {...register("landingPageUrl")}
+            type="url"
+            placeholder="https://www.yourwebsite.com"
+            className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+            data-testid="input-landing-page-url"
+          />
         </div>
 
         {/* Keywords and Terms */}

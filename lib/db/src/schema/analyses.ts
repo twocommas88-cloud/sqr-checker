@@ -12,6 +12,7 @@ export const analyses = pgTable("analyses", {
   competitorBrands: text("competitor_brands").notNull().default("[]"),
   excludePatterns: text("exclude_patterns").notNull().default("[]"),
   customRules: text("custom_rules").notNull().default("[]"),
+  landingPageUrl: text("landing_page_url"),
   minConversionsForNewKeyword: integer("min_conversions_for_new_keyword").notNull().default(1),
   totalTerms: integer("total_terms").notNull().default(0),
   relevantCount: integer("relevant_count").notNull().default(0),

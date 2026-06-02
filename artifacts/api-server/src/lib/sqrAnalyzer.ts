@@ -30,41 +30,166 @@ export interface AnalysisOptions {
   excludePatterns?: string[];
   customRules?: string[];
   minConversionsForNewKeyword?: number;
+  landingPageUrl?: string | null;
 }
 
+// ── Parser ────────────────────────────────────────────────────────────────────
+
+// Header keyword sets for detecting header/metadata rows
+const HEADER_KEYWORDS = new Set([
+  "search term", "keyword", "match type", "campaign", "ad group", "clicks",
+  "impressions", "impr.", "ctr", "cost", "conversions", "currency", "status",
+  "added/excluded", "keyword status", "avg. cpc", "conv. rate",
+]);
+
+function looksLikeHeader(parts: string[]): boolean {
+  const lower = parts[0]?.toLowerCase().trim() ?? "";
+  return HEADER_KEYWORDS.has(lower) || lower === "";
+}
+
+function looksLikeMetaRow(line: string): boolean {
+  const l = line.trim().toLowerCase();
+  // Skip date ranges, empty, "total:", report title lines
+  if (!l) return true;
+  if (/^\d{4}/.test(l) || l.startsWith("total") || l.startsWith("--")) return true;
+  // Lines like "May 3, 2026 - June 1, 2026"
+  if (/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(l) && /\d{4}/.test(l)) return true;
+  return false;
+}
+
+function safeNum(s: string | undefined): number | null {
+  if (!s) return null;
+  const cleaned = s.replace(/[%,$,]/g, "").trim();
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
+}
+
+/**
+ * Parse Google Ads search term reports — handles both:
+ *  - Simple format: term [tab] impressions [tab] clicks [tab] conversions [tab] cost
+ *  - Full Google Ads export: Search term, Match type, Added/Excluded, Campaign, Ad group,
+ *    Clicks, Impr., CTR, Currency code, Avg. CPC, Cost, Keyword, Conv. rate, Conversions, Cost / conv.
+ */
 function parseSearchTerms(raw: string): SearchTermData[] {
-  const lines = raw.split(/\r?\n/).filter((l) => l.trim());
-  return lines.map((line) => {
-    // Try tab-separated first, then comma-separated
-    const parts = line.includes("\t") ? line.split("\t") : line.split(",");
-    const searchTerm = parts[0]?.trim() ?? line.trim();
-    const impressions = parts[1] ? parseFloat(parts[1].trim()) : null;
-    const clicks = parts[2] ? parseFloat(parts[2].trim()) : null;
-    const conversions = parts[3] ? parseFloat(parts[3].trim()) : null;
-    const cost = parts[4] ? parseFloat(parts[4].trim()) : null;
-    return {
-      searchTerm,
-      impressions: isNaN(impressions!) ? null : impressions,
-      clicks: isNaN(clicks!) ? null : clicks,
-      conversions: isNaN(conversions!) ? null : conversions,
-      cost: isNaN(cost!) ? null : cost,
-    };
-  });
+  const lines = raw.split(/\r?\n/);
+  const results: SearchTermData[] = [];
+
+  // Try to find header row and detect column indices
+  let colSearchTerm = 0;
+  let colClicks: number | null = null;
+  let colImpressions: number | null = null;
+  let colCost: number | null = null;
+  let colConversions: number | null = null;
+  let headerFound = false;
+
+  for (const line of lines) {
+    if (looksLikeMetaRow(line)) continue;
+    const sep = line.includes("\t") ? "\t" : ",";
+    const parts = line.split(sep).map((p) => p.trim().replace(/^["']|["']$/g, ""));
+
+    if (!headerFound && looksLikeHeader(parts)) {
+      // Map column names to indices
+      const cols = parts.map((p) => p.toLowerCase().trim());
+      colSearchTerm = Math.max(0, cols.findIndex((c) => c === "search term" || c === "keyword"));
+      colClicks = cols.findIndex((c) => c === "clicks");
+      colImpressions = cols.findIndex((c) => c === "impr." || c === "impressions");
+      colCost = cols.findIndex((c) => c === "cost");
+      colConversions = cols.findIndex((c) => c === "conversions");
+      headerFound = true;
+      continue;
+    }
+
+    const term = parts[colSearchTerm]?.trim();
+    if (!term || term.toLowerCase() === "total") continue;
+
+    if (!headerFound) {
+      // Simple 5-column format fallback
+      results.push({
+        searchTerm: term,
+        impressions: safeNum(parts[1]),
+        clicks: safeNum(parts[2]),
+        conversions: safeNum(parts[3]),
+        cost: safeNum(parts[4]),
+      });
+    } else {
+      results.push({
+        searchTerm: term,
+        impressions: colImpressions != null && colImpressions >= 0 ? safeNum(parts[colImpressions]) : null,
+        clicks: colClicks != null && colClicks >= 0 ? safeNum(parts[colClicks]) : null,
+        conversions: colConversions != null && colConversions >= 0 ? safeNum(parts[colConversions]) : null,
+        cost: colCost != null && colCost >= 0 ? safeNum(parts[colCost]) : null,
+      });
+    }
+  }
+
+  return results;
 }
 
-const BATCH_SIZE = 30;
+// ── URL scraping ──────────────────────────────────────────────────────────────
+
+async function fetchPageText(url: string): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const resp = await fetch(url, {
+      signal: controller.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; SQRAnalyzer/1.0)" },
+    });
+    clearTimeout(timeout);
+    const html = await resp.text();
+    // Strip tags, collapse whitespace, limit length
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim()
+      .slice(0, 3000);
+    return text;
+  } catch {
+    return "";
+  }
+}
+
+// ── Parallel batch runner ─────────────────────────────────────────────────────
+
+async function runWithConcurrency<T>(
+  tasks: (() => Promise<T>)[],
+  concurrency: number
+): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let index = 0;
+
+  async function worker() {
+    while (index < tasks.length) {
+      const i = index++;
+      results[i] = await tasks[i]();
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, worker);
+  await Promise.all(workers);
+  return results;
+}
+
+// ── AI batch analysis ─────────────────────────────────────────────────────────
+
+const BATCH_SIZE = 50;
+const CONCURRENCY = 8;
 
 async function analyzeTermsBatch(
   terms: SearchTermData[],
   activeKeywords: string,
-  options: AnalysisOptions
+  options: AnalysisOptions,
+  pageContext: string
 ): Promise<SearchTermResult[]> {
   const competitorList = options.competitorBrands?.length
-    ? `Competitor brands to flag as negative: ${options.competitorBrands.join(", ")}`
+    ? `Competitor brands to flag as negatives: ${options.competitorBrands.join(", ")}`
     : "No specific competitor brands provided.";
 
   const excludeList = options.excludePatterns?.length
-    ? `Exclude patterns (mark irrelevant): ${options.excludePatterns.join(", ")}`
+    ? `Exclude patterns (mark irrelevant if term contains any): ${options.excludePatterns.join(", ")}`
     : "";
 
   const customRulesList = options.customRules?.length
@@ -72,6 +197,10 @@ async function analyzeTermsBatch(
     : "";
 
   const minConversions = options.minConversionsForNewKeyword ?? 1;
+
+  const pageSection = pageContext
+    ? `\nLanding page content (use to judge relevance — terms matching what this page sells are Relevant):\n"""\n${pageContext}\n"""\n`
+    : "";
 
   const termsJson = JSON.stringify(
     terms.map((t) => ({
@@ -85,56 +214,36 @@ async function analyzeTermsBatch(
 
   const prompt = `You are a Google Ads search query analysis expert following Search Engine Land best practices.
 
-Active Keywords in this account (with match type and ad group where provided):
+Active Keywords in this account (keyword | match type | ad group):
 ${activeKeywords || "Not provided"}
-
+${pageSection}
 ${competitorList}
-${excludeList}
-${customRulesList}
-
-Rules for analysis:
-1. RELEVANCE: A search term is "Relevant" if it matches the intent of the active keywords and would convert for this business. Mark "Irrelevant" if it's off-topic, too broad, navigational to a different site, or matches a competitor brand.
-2. COMPETITOR: Flag as competitor (isCompetitor: true) if the term contains a competitor brand name. These should be added to negative keyword lists.
-3. ADD LEVEL:
-   - "Campaign": Add as negative at campaign level if it's broadly irrelevant to all ad groups
-   - "Ad Group": Add as negative at ad group level if it's only irrelevant to a specific ad group
-   - "None": If the term is relevant, no negative needed
-4. ADD AS KEYWORD: Set addAsKeyword: true ONLY if: term is relevant AND has >= ${minConversions} conversions AND is not already covered by an exact-match active keyword.
-5. SUGGESTED AD GROUP: If addAsKeyword is true, suggest which ad group this new keyword belongs in based on the active keywords list. If the term could also apply to a campaign-level negative strategy, note that.
-6. MATCH TYPE RECOMMENDATION: Consider whether the new keyword should be exact, phrase, or broad match based on specificity.
-7. REASON: Be specific and actionable. Reference the matched keyword if relevant.
+${excludeList ? excludeList + "\n" : ""}${customRulesList ? customRulesList + "\n" : ""}
+Rules:
+1. RELEVANCE: "Relevant" if the term matches the business intent (what the landing page sells, or what the active keywords target). "Irrelevant" if off-topic, navigational to another brand, or too informational with no purchase intent.
+2. COMPETITOR: isCompetitor=true if the term contains a competitor brand name — these need to be added as negatives.
+3. ADD LEVEL: "Campaign" = broadly irrelevant to all ad groups; "Ad Group" = irrelevant to only one ad group; "None" = relevant (no negative needed).
+4. ADD AS KEYWORD: addAsKeyword=true ONLY if: relevant AND >= ${minConversions} conversions AND not already covered by an existing exact-match keyword.
+5. SUGGESTED AD GROUP: If addAsKeyword=true, suggest the best ad group from the active keywords list.
+6. MATCHED KEYWORD: The active keyword this search term matched or is closest to.
+7. REASON: Be concise and specific (max 15 words).
 
 Search terms to analyze:
 ${termsJson}
 
-Return a JSON array (no markdown, no explanation, just valid JSON array) with exactly one object per search term in this format:
-[
-  {
-    "searchTerm": "exact term from input",
-    "relevance": "Relevant" or "Irrelevant",
-    "reason": "specific reason",
-    "addLevel": "Campaign" or "Ad Group" or "None",
-    "addAsKeyword": true or false,
-    "suggestedAdGroup": "Ad Group Name" or null,
-    "isCompetitor": true or false,
-    "matchedKeyword": "the active keyword it matched" or null
-  }
-]`;
+Return ONLY a valid JSON array with exactly ${terms.length} objects, one per search term, in this exact format — no markdown, no explanation:
+[{"searchTerm":"...","relevance":"Relevant","reason":"...","addLevel":"None","addAsKeyword":false,"suggestedAdGroup":null,"isCompetitor":false,"matchedKeyword":"..."}]`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5.1",
+    model: "gpt-4.1-mini",
     max_completion_tokens: 8192,
     messages: [{ role: "user", content: prompt }],
   });
 
   const content = response.choices[0]?.message?.content ?? "[]";
-  
-  // Extract JSON array from response
   const match = content.match(/\[[\s\S]*\]/);
-  if (!match) {
-    throw new Error("Could not parse AI response as JSON array");
-  }
-  
+  if (!match) throw new Error("Could not parse AI response as JSON array");
+
   const parsed = JSON.parse(match[0]) as Array<{
     searchTerm: string;
     relevance: "Relevant" | "Irrelevant";
@@ -159,15 +268,28 @@ Return a JSON array (no markdown, no explanation, just valid JSON array) with ex
   }));
 }
 
+// ── Main export ───────────────────────────────────────────────────────────────
+
 export async function analyzeSearchQueries(options: AnalysisOptions): Promise<SearchTermResult[]> {
   const terms = parseSearchTerms(options.searchTerms);
-  const results: SearchTermResult[] = [];
+  if (terms.length === 0) return [];
 
+  // Fetch landing page context in parallel with setup
+  const pageContext = options.landingPageUrl
+    ? await fetchPageText(options.landingPageUrl)
+    : "";
+
+  // Split into batches
+  const batches: SearchTermData[][] = [];
   for (let i = 0; i < terms.length; i += BATCH_SIZE) {
-    const batch = terms.slice(i, i + BATCH_SIZE);
-    const batchResults = await analyzeTermsBatch(batch, options.activeKeywords, options);
-    results.push(...batchResults);
+    batches.push(terms.slice(i, i + BATCH_SIZE));
   }
 
-  return results;
+  // Run all batches in parallel (up to CONCURRENCY at once)
+  const tasks = batches.map(
+    (batch) => () => analyzeTermsBatch(batch, options.activeKeywords, options, pageContext)
+  );
+
+  const batchResults = await runWithConcurrency(tasks, CONCURRENCY);
+  return batchResults.flat();
 }

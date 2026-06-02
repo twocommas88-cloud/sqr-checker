@@ -94,6 +94,7 @@ router.post("/analyses", async (req, res): Promise<void> => {
       ruleSetId: data.ruleSetId ?? null,
       activeKeywords: data.activeKeywords,
       searchTerms: data.searchTerms,
+      landingPageUrl: data.landingPageUrl ?? null,
       competitorBrands: JSON.stringify(data.competitorBrands ?? []),
       excludePatterns: JSON.stringify(data.excludePatterns ?? []),
       customRules: JSON.stringify(data.customRules ?? []),
@@ -110,6 +111,7 @@ router.post("/analyses", async (req, res): Promise<void> => {
       const results = await analyzeSearchQueries({
         activeKeywords: data.activeKeywords,
         searchTerms: data.searchTerms,
+        landingPageUrl: data.landingPageUrl ?? null,
         competitorBrands: data.competitorBrands ?? [],
         excludePatterns: data.excludePatterns ?? [],
         customRules: data.customRules ?? [],
