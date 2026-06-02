@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "SQR Analyzer"
+version = "1.0.0"
+id = "artifacts/sqr-analyzer"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20949
+
+[services.development]
+run = "pnpm --filter @workspace/sqr-analyzer run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/sqr-analyzer", "run", "build" ]
+publicDir = "artifacts/sqr-analyzer/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20949"
+BASE_PATH = "/"

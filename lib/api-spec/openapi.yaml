@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Google Ads Search Query Analysis API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: rules
+    description: Account analysis rules
+  - name: analyses
+    description: Search query analyses
 paths:
   /healthz:
     get:
@@ -24,6 +28,162 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /rules:
+    get:
+      operationId: listRules
+      tags: [rules]
+      summary: List all saved rule sets
+      responses:
+        "200":
+          description: List of rule sets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RuleSet"
+    post:
+      operationId: createRuleSet
+      tags: [rules]
+      summary: Create a new rule set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleSetInput"
+      responses:
+        "201":
+          description: Created rule set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleSet"
+
+  /rules/{id}:
+    get:
+      operationId: getRuleSet
+      tags: [rules]
+      summary: Get a rule set by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rule set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleSet"
+        "404":
+          description: Not found
+    put:
+      operationId: updateRuleSet
+      tags: [rules]
+      summary: Update a rule set
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleSetInput"
+      responses:
+        "200":
+          description: Updated rule set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleSet"
+    delete:
+      operationId: deleteRuleSet
+      tags: [rules]
+      summary: Delete a rule set
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /analyses:
+    get:
+      operationId: listAnalyses
+      tags: [analyses]
+      summary: List past analyses
+      responses:
+        "200":
+          description: List of analyses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnalysisSummary"
+    post:
+      operationId: createAnalysis
+      tags: [analyses]
+      summary: Run a new search query analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisInput"
+      responses:
+        "201":
+          description: Created analysis with results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+
+  /analyses/{id}:
+    get:
+      operationId: getAnalysis
+      tags: [analyses]
+      summary: Get a specific analysis with full results
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Analysis with results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+        "404":
+          description: Not found
+
+  /analyses/stats:
+    get:
+      operationId: getAnalysisStats
+      tags: [analyses]
+      summary: Get aggregate stats across all analyses
+      responses:
+        "200":
+          description: Stats summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +194,187 @@ components:
       required:
         - status
 
+    RuleSet:
+      type: object
+      required: [id, name, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        accountName:
+          type: ["string", "null"]
+        competitorBrands:
+          type: array
+          items:
+            type: string
+        excludePatterns:
+          type: array
+          items:
+            type: string
+        customRules:
+          type: array
+          items:
+            type: string
+        minConversionsForNewKeyword:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    RuleSetInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        accountName:
+          type: string
+        competitorBrands:
+          type: array
+          items:
+            type: string
+        excludePatterns:
+          type: array
+          items:
+            type: string
+        customRules:
+          type: array
+          items:
+            type: string
+        minConversionsForNewKeyword:
+          type: integer
+
+    AnalysisInput:
+      type: object
+      required: [activeKeywords, searchTerms]
+      properties:
+        name:
+          type: string
+        ruleSetId:
+          type: ["integer", "null"]
+        activeKeywords:
+          type: string
+          description: Newline or comma separated list of active keywords with their match types and ad groups
+        searchTerms:
+          type: string
+          description: Newline or tab-separated search term data (term, impressions, clicks, conversions, cost)
+        competitorBrands:
+          type: array
+          items:
+            type: string
+        excludePatterns:
+          type: array
+          items:
+            type: string
+        customRules:
+          type: array
+          items:
+            type: string
+        minConversionsForNewKeyword:
+          type: integer
+
+    SearchTermResult:
+      type: object
+      required: [searchTerm, relevance, reason, addLevel, addAsKeyword, suggestedAdGroup, isCompetitor]
+      properties:
+        searchTerm:
+          type: string
+        impressions:
+          type: ["integer", "null"]
+        clicks:
+          type: ["integer", "null"]
+        conversions:
+          type: ["number", "null"]
+        cost:
+          type: ["number", "null"]
+        relevance:
+          type: string
+          enum: [Relevant, Irrelevant]
+        reason:
+          type: string
+        addLevel:
+          type: string
+          enum: [Campaign, Ad Group, None]
+        addAsKeyword:
+          type: boolean
+        suggestedAdGroup:
+          type: ["string", "null"]
+        isCompetitor:
+          type: boolean
+        matchedKeyword:
+          type: ["string", "null"]
+
+    Analysis:
+      type: object
+      required: [id, name, status, results, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        ruleSetId:
+          type: ["integer", "null"]
+        totalTerms:
+          type: integer
+        relevantCount:
+          type: integer
+        irrelevantCount:
+          type: integer
+        newKeywordCount:
+          type: integer
+        competitorCount:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchTermResult"
+        errorMessage:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    AnalysisSummary:
+      type: object
+      required: [id, name, status, totalTerms, relevantCount, irrelevantCount, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        ruleSetId:
+          type: ["integer", "null"]
+        totalTerms:
+          type: integer
+        relevantCount:
+          type: integer
+        irrelevantCount:
+          type: integer
+        newKeywordCount:
+          type: integer
+        competitorCount:
+          type: integer
+        createdAt:
+          type: string
+
+    AnalysisStats:
+      type: object
+      required: [totalAnalyses, totalTermsAnalyzed, avgRelevanceRate, topCompetitors]
+      properties:
+        totalAnalyses:
+          type: integer
+        totalTermsAnalyzed:
+          type: integer
+        avgRelevanceRate:
+          type: number
+        topCompetitors:
+          type: array
+          items:
+            type: string
