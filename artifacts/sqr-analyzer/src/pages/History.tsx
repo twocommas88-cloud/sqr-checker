@@ -1,9 +1,28 @@
-import { Link } from "wouter";
-import { useListAnalyses } from "@workspace/api-client-react";
-import { ArrowRight, Clock, Search, Loader2 } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { useListAnalyses, useDeleteAnalysis, getListAnalysesQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { ArrowRight, Clock, Search, Loader2, Trash2 } from "lucide-react";
 
 export default function History() {
   const { data: analyses, isLoading } = useListAnalyses();
+  const deleteAnalysis = useDeleteAnalysis();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  function handleDelete(id: number, name: string, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    deleteAnalysis.mutate({ id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
+        toast({ title: "Analysis deleted" });
+      },
+      onError: () => toast({ title: "Error", description: "Failed to delete", variant: "destructive" }),
+    });
+  }
 
   return (
     <div className="flex-1 overflow-auto">
@@ -52,12 +71,17 @@ export default function History() {
                   <th className="text-right px-4 py-3">New KWs</th>
                   <th className="text-right px-4 py-3">Competitors</th>
                   <th className="text-left px-4 py-3">Status</th>
-                  <th className="px-4 py-3"></th>
+                  <th className="px-4 py-3 w-[90px]"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {analyses.map((a) => (
-                  <tr key={a.id} className="hover:bg-muted/20 transition-colors" data-testid={`row-history-${a.id}`}>
+                  <tr
+                    key={a.id}
+                    className="hover:bg-muted/20 transition-colors cursor-pointer"
+                    onClick={() => setLocation(`/results/${a.id}`)}
+                    data-testid={`row-history-${a.id}`}
+                  >
                     <td className="px-5 py-3 font-medium text-foreground">{a.name}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
                       <span className="flex items-center gap-1.5">
@@ -77,17 +101,30 @@ export default function History() {
                         a.status === "failed" ? "bg-red-100 text-red-700" :
                         "bg-muted text-muted-foreground"
                       }`}>
+                        {a.status === "processing" && <Loader2 className="w-3 h-3 inline animate-spin mr-1" />}
                         {a.status}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/results/${a.id}`}
-                        className="text-primary hover:underline flex items-center gap-1 text-xs font-medium"
-                        data-testid={`link-results-${a.id}`}
-                      >
-                        View <ArrowRight className="w-3.5 h-3.5" />
-                      </Link>
+                      <div className="flex items-center gap-2 justify-end">
+                        <Link
+                          href={`/results/${a.id}`}
+                          className="text-primary hover:underline flex items-center gap-1 text-xs font-medium"
+                          onClick={(e) => e.stopPropagation()}
+                          data-testid={`link-results-${a.id}`}
+                        >
+                          View <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                        <button
+                          onClick={(e) => handleDelete(a.id, a.name, e)}
+                          disabled={deleteAnalysis.isPending}
+                          className="p-1 text-muted-foreground hover:text-destructive rounded transition-colors"
+                          title="Delete"
+                          data-testid={`button-delete-${a.id}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

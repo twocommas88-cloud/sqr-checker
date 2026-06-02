@@ -148,6 +148,21 @@ router.post("/analyses", async (req, res): Promise<void> => {
   })();
 });
 
+router.delete("/analyses/:id", async (req, res): Promise<void> => {
+  const parsed = GetAnalysisParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const [row] = await db.select().from(analyses).where(eq(analyses.id, parsed.data.id));
+  if (!row) {
+    res.status(404).json({ error: "Analysis not found" });
+    return;
+  }
+  await db.delete(analyses).where(eq(analyses.id, parsed.data.id));
+  res.status(204).end();
+});
+
 router.get("/analyses/:id", async (req, res): Promise<void> => {
   const params = GetAnalysisParams.safeParse(req.params);
   if (!params.success) {

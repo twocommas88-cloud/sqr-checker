@@ -151,6 +151,21 @@ paths:
                 $ref: "#/components/schemas/Analysis"
 
   /analyses/{id}:
+    delete:
+      operationId: deleteAnalysis
+      tags: [analyses]
+      summary: Delete an analysis by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
     get:
       operationId: getAnalysis
       tags: [analyses]

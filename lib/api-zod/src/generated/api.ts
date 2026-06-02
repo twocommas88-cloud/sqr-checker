@@ -139,6 +139,14 @@ export const CreateAnalysisBody = zod.object({
 
 
 /**
+ * @summary Delete an analysis by ID
+ */
+export const DeleteAnalysisParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary Get a specific analysis with full results
  */
 export const GetAnalysisParams = zod.object({

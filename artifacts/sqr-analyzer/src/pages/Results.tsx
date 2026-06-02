@@ -1,8 +1,12 @@
-import { useState, useEffect } from "react";
-import { useRoute, Link } from "wouter";
-import { useGetAnalysis, getGetAnalysisQueryKey } from "@workspace/api-client-react";
+import { useState, useEffect, useMemo } from "react";
+import { useRoute, Link, useLocation } from "wouter";
+import {
+  useGetAnalysis, getGetAnalysisQueryKey,
+  useDeleteAnalysis, getListAnalysesQueryKey
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Download, ArrowLeft, Loader2, AlertTriangle, Filter, X } from "lucide-react";
+import { Download, ArrowLeft, Loader2, AlertTriangle, Filter, X, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 type Relevance = "Relevant" | "Irrelevant" | "";
 type AddLevel = "Campaign" | "Ad Group" | "None" | "";
@@ -30,8 +34,51 @@ type AnalysisResult = {
   matchedKeyword?: string | null;
 };
 
+// ── N-gram extraction ────────────────────────────────────────────────────────
+
+const STOP_WORDS = new Set([
+  "a","an","the","and","or","but","in","on","at","to","for","of","with","by","as",
+  "is","are","was","were","be","been","being","have","has","had","do","does","did",
+  "will","would","could","should","may","might","can","not","no","nor","so","yet",
+  "if","when","where","how","what","who","which","that","this","these","those",
+  "it","its","i","me","my","we","our","you","your","he","she","they","their",
+  "from","about","into","through","after","before","up","down","out","off","over",
+  "under","get","got","go","gone","come","came","make","made","take","took",
+  "near","me","my","&","vs","vs.","vs","–","—",
+]);
+
+function extractNgrams(irrelevantTerms: string[]): string[] {
+  const freq: Record<string, number> = {};
+
+  for (const term of irrelevantTerms) {
+    const words = term
+      .toLowerCase()
+      .replace(/[^a-z0-9\s'-]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
+
+    // 1-grams, 2-grams, 3-grams
+    for (let n = 1; n <= 3; n++) {
+      for (let i = 0; i <= words.length - n; i++) {
+        const ngram = words.slice(i, i + n).join(" ");
+        if (ngram.trim()) {
+          freq[ngram] = (freq[ngram] ?? 0) + 1;
+        }
+      }
+    }
+  }
+
+  // Sort by frequency desc, then alphabetically; return phrases with freq >= 1
+  return Object.entries(freq)
+    .filter(([, count]) => count >= 1)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([ngram]) => ngram);
+}
+
+// ── CSV download ─────────────────────────────────────────────────────────────
+
 function downloadCSV(results: AnalysisResult[], name: string) {
-  const headers = ["Search Term", "Impressions", "Clicks", "Conversions", "Cost", "Relevance", "Reason", "Add Level", "Add as Keyword", "Suggested Ad Group", "Is Competitor", "Matched Keyword"];
+  const headers = ["Search Term","Impressions","Clicks","Conversions","Cost","Relevance","Reason","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword"];
   const rows = results.map((r) => [
     `"${r.searchTerm.replace(/"/g, '""')}"`,
     r.impressions ?? "",
@@ -56,15 +103,22 @@ function downloadCSV(results: AnalysisResult[], name: string) {
   URL.revokeObjectURL(url);
 }
 
+// ── Component ────────────────────────────────────────────────────────────────
+
 export default function Results() {
   const [, params] = useRoute("/results/:id");
+  const [, setLocation] = useLocation();
   const id = parseInt(params?.id ?? "0", 10);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: analysis, isLoading } = useGetAnalysis(id, {
     query: { enabled: !!id, queryKey: getGetAnalysisQueryKey(id) }
   });
 
+  const deleteAnalysis = useDeleteAnalysis();
+
+  // Poll while processing
   useEffect(() => {
     if (!analysis || analysis.status === "completed" || analysis.status === "failed") return;
     const interval = setInterval(() => {
@@ -74,24 +128,19 @@ export default function Results() {
   }, [analysis?.status, id, queryClient]);
 
   const [filters, setFilters] = useState<Filters>({
-    relevance: "",
-    addLevel: "",
-    addAsKeyword: "",
-    isCompetitor: "",
-    search: "",
+    relevance: "", addLevel: "", addAsKeyword: "", isCompetitor: "", search: "",
   });
 
   function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((f) => ({ ...f, [key]: value }));
   }
-
   function clearFilters() {
     setFilters({ relevance: "", addLevel: "", addAsKeyword: "", isCompetitor: "", search: "" });
   }
 
   const hasFilters = Object.values(filters).some(Boolean);
-
   const results = (analysis?.results ?? []) as AnalysisResult[];
+
   const filtered = results.filter((r) => {
     if (filters.relevance && r.relevance !== filters.relevance) return false;
     if (filters.addLevel && r.addLevel !== filters.addLevel) return false;
@@ -104,21 +153,30 @@ export default function Results() {
   });
 
   const competitors = results.filter((r) => r.isCompetitor);
+  const irrelevantNonCompetitor = results.filter((r) => r.relevance === "Irrelevant" && !r.isCompetitor);
 
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-      </div>
-    );
+  const ngrams = useMemo(
+    () => extractNgrams(irrelevantNonCompetitor.map((r) => r.searchTerm)),
+    [irrelevantNonCompetitor.length]
+  );
+
+  function handleDelete() {
+    if (!confirm("Delete this analysis? This cannot be undone.")) return;
+    deleteAnalysis.mutate({ id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
+        toast({ title: "Analysis deleted" });
+        setLocation("/history");
+      },
+      onError: () => toast({ title: "Error", description: "Failed to delete", variant: "destructive" }),
+    });
   }
 
+  if (isLoading) {
+    return <div className="flex-1 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  }
   if (!analysis) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-muted-foreground">Analysis not found.</p>
-      </div>
-    );
+    return <div className="flex-1 flex items-center justify-center"><p className="text-muted-foreground">Analysis not found.</p></div>;
   }
 
   return (
@@ -126,11 +184,7 @@ export default function Results() {
       {/* Header */}
       <div className="px-8 py-5 border-b border-border bg-card/50 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-4">
-          <Link
-            href="/history"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            data-testid="link-back"
-          >
+          <Link href="/history" className="text-muted-foreground hover:text-foreground transition-colors" data-testid="link-back">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
@@ -147,15 +201,26 @@ export default function Results() {
             {analysis.status}
           </span>
         </div>
-        <button
-          onClick={() => downloadCSV(results, analysis.name)}
-          disabled={analysis.status !== "completed"}
-          className="flex items-center gap-2 bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-          data-testid="button-download-csv"
-        >
-          <Download className="w-4 h-4" />
-          Download CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDelete}
+            disabled={deleteAnalysis.isPending}
+            className="flex items-center gap-1.5 border border-destructive/40 text-destructive text-sm font-medium px-3 py-2 rounded-md hover:bg-destructive/10 transition-colors disabled:opacity-50"
+            data-testid="button-delete"
+          >
+            {deleteAnalysis.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            Delete
+          </button>
+          <button
+            onClick={() => downloadCSV(results, analysis.name)}
+            disabled={analysis.status !== "completed"}
+            className="flex items-center gap-2 bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            data-testid="button-download-csv"
+          >
+            <Download className="w-4 h-4" />
+            Download CSV
+          </button>
+        </div>
       </div>
 
       {analysis.status === "processing" || analysis.status === "pending" ? (
@@ -163,7 +228,7 @@ export default function Results() {
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
           <div className="text-center">
             <p className="font-medium text-foreground">Analyzing search terms...</p>
-            <p className="text-sm text-muted-foreground mt-1">The AI is reviewing your terms against your keywords and rules.</p>
+            <p className="text-sm text-muted-foreground mt-1">The AI is reviewing your terms. You can delete this if you want to cancel.</p>
           </div>
         </div>
       ) : analysis.status === "failed" ? (
@@ -183,22 +248,45 @@ export default function Results() {
             <span className="text-amber-600 font-medium">{analysis.competitorCount} competitors</span>
           </div>
 
-          {/* Competitor negatives panel */}
-          {competitors.length > 0 && (
-            <div className="mx-8 mt-4 mb-0 bg-red-50 border border-red-200 rounded-xl p-4 flex-shrink-0">
-              <p className="text-sm font-semibold text-red-800 mb-2 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" />
-                Competitor Terms — Add to Negative List ({competitors.length})
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {competitors.map((r, i) => (
-                  <span key={i} className="text-xs bg-white border border-red-200 text-red-700 px-2 py-0.5 rounded" data-testid={`competitor-term-${i}`}>
-                    {r.searchTerm}
-                  </span>
-                ))}
+          <div className="px-8 mt-4 space-y-3 flex-shrink-0">
+            {/* Competitor negatives panel — Exact match format [term] */}
+            {competitors.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-red-800 mb-2 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Competitor Terms — Add as Exact Match Negatives ({competitors.length})
+                </p>
+                <p className="text-xs text-red-600/70 mb-2">Exact match format: add these as negative exact match keywords</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {competitors.map((r, i) => (
+                    <code key={i} className="text-xs bg-white border border-red-200 text-red-700 px-2 py-0.5 rounded font-mono" data-testid={`competitor-term-${i}`}>
+                      [{r.searchTerm}]
+                    </code>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* N-gram negative suggestions — Phrase match format "term" */}
+            {ngrams.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-amber-800 mb-1 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Suggested Negative N-Grams — Add as Phrase Match ({ngrams.length})
+                </p>
+                <p className="text-xs text-amber-700/70 mb-2">
+                  Phrase match format: extracted from irrelevant search terms. Review and add the ones that make sense for your campaigns.
+                </p>
+                <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                  {ngrams.map((ng, i) => (
+                    <code key={i} className="text-xs bg-white border border-amber-200 text-amber-800 px-2 py-0.5 rounded font-mono" data-testid={`ngram-${i}`}>
+                      "{ng}"
+                    </code>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Filters */}
           <div className="px-8 py-3 flex items-center gap-3 flex-wrap flex-shrink-0 mt-3">
@@ -247,23 +335,21 @@ export default function Results() {
                 <thead className="bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   <tr>
                     <th className="text-left px-4 py-3 w-[200px]">Search Term</th>
-                    <th className="text-right px-3 py-3 w-[90px]">Impr.</th>
-                    <th className="text-right px-3 py-3 w-[70px]">Clicks</th>
-                    <th className="text-right px-3 py-3 w-[80px]">Conv.</th>
-                    <th className="text-right px-3 py-3 w-[80px]">Cost</th>
-                    <th className="text-left px-3 py-3 w-[110px]">Relevance</th>
+                    <th className="text-right px-3 py-3 w-[80px]">Impr.</th>
+                    <th className="text-right px-3 py-3 w-[65px]">Clicks</th>
+                    <th className="text-right px-3 py-3 w-[70px]">Conv.</th>
+                    <th className="text-right px-3 py-3 w-[70px]">Cost</th>
+                    <th className="text-left px-3 py-3 w-[100px]">Relevance</th>
                     <th className="text-left px-3 py-3">Reason</th>
-                    <th className="text-left px-3 py-3 w-[110px]">Add Level</th>
-                    <th className="text-left px-3 py-3 w-[80px]">New KW?</th>
-                    <th className="text-left px-3 py-3 w-[140px]">Suggested Ad Group</th>
-                    <th className="text-left px-3 py-3 w-[90px]">Competitor</th>
+                    <th className="text-left px-3 py-3 w-[100px]">Add Level</th>
+                    <th className="text-left px-3 py-3 w-[75px]">New KW?</th>
+                    <th className="text-left px-3 py-3 w-[130px]">Ad Group</th>
+                    <th className="text-left px-3 py-3 w-[85px]">Competitor</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filtered.length === 0 ? (
-                    <tr>
-                      <td colSpan={11} className="px-4 py-10 text-center text-muted-foreground text-sm">No results match your filters</td>
-                    </tr>
+                    <tr><td colSpan={11} className="px-4 py-10 text-center text-muted-foreground text-sm">No results match your filters</td></tr>
                   ) : filtered.map((r, i) => (
                     <tr key={i} className="hover:bg-muted/20 transition-colors" data-testid={`row-result-${i}`}>
                       <td className="px-4 py-2.5 font-medium text-foreground max-w-[200px]">
@@ -293,9 +379,7 @@ export default function Results() {
                           }`} data-testid={`add-level-${i}`}>
                             {r.addLevel}
                           </span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
+                        ) : <span className="text-muted-foreground text-xs">—</span>}
                       </td>
                       <td className="px-3 py-2.5">
                         <span className={`text-xs font-medium ${r.addAsKeyword ? "text-primary" : "text-muted-foreground"}`} data-testid={`add-keyword-${i}`}>
@@ -308,9 +392,7 @@ export default function Results() {
                       <td className="px-3 py-2.5">
                         {r.isCompetitor ? (
                           <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded" data-testid={`is-competitor-${i}`}>Yes</span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
+                        ) : <span className="text-muted-foreground text-xs">—</span>}
                       </td>
                     </tr>
                   ))}
