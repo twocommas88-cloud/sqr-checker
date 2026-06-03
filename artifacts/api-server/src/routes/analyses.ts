@@ -20,6 +20,7 @@ function parseRow(row: typeof analyses.$inferSelect) {
     targetLocations: row.targetLocations ?? null,
     landingPageUrl: row.landingPageUrl ?? null,
     relevantBrandTerms: row.relevantBrandTerms ?? null,
+    searchTerms: row.searchTerms,
     competitorBrands: JSON.parse(row.competitorBrands) as string[],
     excludePatterns: JSON.parse(row.excludePatterns) as string[],
     customRules: JSON.parse(row.customRules) as string[],

@@ -6,7 +6,7 @@ import {
   useCreateRuleSet,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Download, ArrowLeft, Loader2, AlertTriangle, Filter, X, Trash2, RefreshCw, Sheet, BookmarkPlus } from "lucide-react";
+import { Download, ArrowLeft, Loader2, AlertTriangle, Filter, X, Trash2, RefreshCw, Sheet, BookmarkPlus, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type Relevance = "Relevant" | "Irrelevant" | "";
@@ -104,11 +104,31 @@ function getActiveKeywordWords(activeKeywords: string): Set<string> {
   return words;
 }
 
+// Core service words that should NEVER be suggested as negatives
+const CORE_SERVICE_WORDS = new Set([
+  "junk", "removal", "hauling", "service", "services", "cleaning", "movers",
+  "moving", "disposal", "waste", "trash", "rubbish", "debris", "clutter",
+  "pickup", "pick", "up", "haul", "remove", "clean", "move",
+  "local", "near", "me", "cheap", "affordable", "best", "top", "fast",
+  "quick", "same", "day", "next", "emergency", "same-day", "next-day",
+  "furniture", "appliance", "mattress", "couch", "sofa", "refrigerator",
+  "fridge", "washer", "dryer", "tv", "television", "yard", "garage",
+  "basement", "attic", "estate", "foreclosure", "office", "commercial",
+  "residential", "home", "house", "apartment", "condo", "storage",
+  "unit", "container", "bin", "bag", "load", "dump", "landfill",
+  "recycling", "donate", "donation", "charity", "salvation", "goodwill",
+  "restore", "renovation", "construction", "demolition", "remodel",
+  "contractor", "builder", "handyman", "maintenance", "repair",
+]);
+
 function conflictsWithActiveKeywords(ngram: string, activeKwWords: Set<string>): boolean {
   // A 1-word negative "ngram" is a conflict if it is one of the individual words
   // that appears in any active keyword. E.g. if "junk" is a keyword word, don't
   // suggest "junk" as a negative term.
-  return activeKwWords.has(ngram);
+  if (activeKwWords.has(ngram)) return true;
+  // Also reject core service words that are almost always relevant
+  if (CORE_SERVICE_WORDS.has(ngram)) return true;
+  return false;
 }
 
 function extractNgrams(irrelevantTerms: string[], activeKeywords: string): string[] {
@@ -178,9 +198,11 @@ function downloadCSV(results: AnalysisResult[], name: string) {
 }
 
 async function copyForSheets(results: AnalysisResult[], name: string): Promise<void> {
-  const headers = ["Search Term","Impressions","Clicks","Conversions","Cost","Relevance","Reason","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Out-of-Area Location"];
+  const headers = ["Search Term","Campaign Name","Ad Group Name","Impressions","Clicks","Conversions","Cost","Relevance","Reason","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Out-of-Area Location"];
   const rows = results.map((r) => [
     r.searchTerm,
+    r.campaignName ?? "",
+    r.adGroupName ?? "",
     r.impressions ?? "",
     r.clicks ?? "",
     r.conversions ?? "",
@@ -207,6 +229,7 @@ interface SaveProfileModalProps {
     activeKeywords: string;
     landingPageUrl?: string | null;
     targetLocations?: string | null;
+    relevantBrandTerms?: string | null;
     competitorBrands?: string[];
     excludePatterns?: string[];
     customRules?: string[];
@@ -300,6 +323,22 @@ export default function Results() {
     queryClient.invalidateQueries({ queryKey: getGetAnalysisQueryKey(id) });
   }
 
+  function handleRedo() {
+    if (!analysis) return;
+    const query = new URLSearchParams();
+    query.set("name", analysis.name ?? "");
+    query.set("activeKeywords", analysis.activeKeywords ?? "");
+    query.set("searchTerms", analysis.searchTerms ?? "");
+    if (analysis.landingPageUrl) query.set("landingPageUrl", analysis.landingPageUrl);
+    if (analysis.targetLocations) query.set("targetLocations", analysis.targetLocations);
+    if (analysis.relevantBrandTerms) query.set("relevantBrandTerms", analysis.relevantBrandTerms);
+    if (analysis.competitorBrands?.length) query.set("competitorBrands", JSON.stringify(analysis.competitorBrands));
+    if (analysis.excludePatterns?.length) query.set("excludePatterns", JSON.stringify(analysis.excludePatterns));
+    if (analysis.customRules?.length) query.set("customRules", JSON.stringify(analysis.customRules));
+    if (analysis.minConversionsForNewKeyword != null) query.set("minConversionsForNewKeyword", String(analysis.minConversionsForNewKeyword));
+    setLocation(`/analyze?${query.toString()}`);
+  }
+
   async function handleCopyForSheets() {
     if (!analysis) return;
     try {
@@ -318,6 +357,7 @@ export default function Results() {
         activeKeywords: analysis.activeKeywords ?? undefined,
         landingPageUrl: analysis.landingPageUrl ?? undefined,
         targetLocations: analysis.targetLocations ?? undefined,
+        relevantBrandTerms: analysis.relevantBrandTerms ?? undefined,
         competitorBrands: (analysis.competitorBrands as string[] | undefined) ?? [],
         excludePatterns: (analysis.excludePatterns as string[] | undefined) ?? [],
         customRules: (analysis.customRules as string[] | undefined) ?? [],
@@ -438,6 +478,15 @@ export default function Results() {
           >
             {deleteAnalysis.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
             Delete
+          </button>
+          <button
+            onClick={handleRedo}
+            className="flex items-center gap-1.5 border border-primary/40 text-primary text-sm font-medium px-3 py-2 rounded-md hover:bg-primary/10 transition-colors"
+            title="Redo with same inputs"
+            data-testid="button-redo"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Redo
           </button>
           <button
             onClick={handleCopyForSheets}

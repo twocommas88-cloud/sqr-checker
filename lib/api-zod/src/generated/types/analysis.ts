@@ -16,6 +16,8 @@ export interface Analysis {
   ruleSetId?: number | null;
   /** The raw active keywords string used for this analysis */
   activeKeywords?: string;
+  /** The raw search terms string used for this analysis */
+  searchTerms?: string;
   /**
      * Target service locations used for this analysis
      * @nullable

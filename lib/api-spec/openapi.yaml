@@ -373,6 +373,9 @@ components:
         activeKeywords:
           type: string
           description: The raw active keywords string used for this analysis
+        searchTerms:
+          type: string
+          description: The raw search terms string used for this analysis
         targetLocations:
           type: ["string", "null"]
           description: Target service locations used for this analysis

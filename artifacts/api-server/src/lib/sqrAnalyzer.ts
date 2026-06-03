@@ -296,6 +296,11 @@ ${termsJson}
 Return ONLY a valid JSON array with exactly ${terms.length} objects, one per search term, in this exact format — no markdown, no explanation:
 [{"searchTerm":"...","relevance":"Relevant","reason":"...","addLevel":"None","addAsKeyword":false,"suggestedAdGroup":null,"isCompetitor":false,"matchedKeyword":"...","outOfAreaLocation":null}]
 
+CRITICAL RULES FOR JSON OUTPUT:
+- The "relevance" field MUST be exactly "Relevant" or "Irrelevant" — no other text, no sentence, no explanation. Just the single word.
+- The "reason" field MUST be a separate concise sentence (max 15 words). Never put the reason text inside the "relevance" field.
+- Keep the exact JSON field order shown above.
+
 outOfAreaLocation: If the term is flagged as outside the target service area, set this to the specific location word or phrase found in the search term that is NOT in the target locations list (e.g. "lewisburg", "nashville"). Otherwise null.`;
 
   const response = await openai.chat.completions.create({

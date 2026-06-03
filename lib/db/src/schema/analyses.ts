@@ -14,7 +14,7 @@ export const analyses = pgTable("analyses", {
   customRules: text("custom_rules").notNull().default("[]"),
   landingPageUrl: text("landing_page_url"),
   targetLocations: text("target_locations"),
-  relevantBrandTerms: text("relevant_brand_terms").notNull().default("[]"),
+  relevantBrandTerms: text("relevant_brand_terms"),
   minConversionsForNewKeyword: integer("min_conversions_for_new_keyword").notNull().default(1),
   totalTerms: integer("total_terms").notNull().default(0),
   relevantCount: integer("relevant_count").notNull().default(0),

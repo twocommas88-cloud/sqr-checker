@@ -181,6 +181,7 @@ export const GetAnalysisResponse = zod.object({
   "status": zod.enum(['pending', 'processing', 'completed', 'failed']),
   "ruleSetId": zod.number().nullish(),
   "activeKeywords": zod.string().optional().describe('The raw active keywords string used for this analysis'),
+  "searchTerms": zod.string().optional().describe('The raw search terms string used for this analysis'),
   "targetLocations": zod.string().nullish().describe('Target service locations used for this analysis'),
   "landingPageUrl": zod.string().nullish().describe('Landing page URL used for this analysis'),
   "relevantBrandTerms": zod.string().nullish().describe('Brand terms that should always be considered relevant for this analysis'),

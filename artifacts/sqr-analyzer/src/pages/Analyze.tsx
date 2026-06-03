@@ -57,7 +57,11 @@ export default function Analyze() {
         if (rs.activeKeywords) setValue("activeKeywords", rs.activeKeywords);
         if (rs.landingPageUrl) setValue("landingPageUrl", rs.landingPageUrl);
         if (rs.targetLocations) setValue("targetLocations", rs.targetLocations);
-        if (rs.relevantBrandTerms) setValue("relevantBrandTerms", rs.relevantBrandTerms);
+        if (rs.relevantBrandTerms) {
+          const terms = rs.relevantBrandTerms.split(",").map((s) => s.trim()).filter(Boolean);
+          setRelevantBrandTerms(terms);
+          setValue("relevantBrandTerms", rs.relevantBrandTerms);
+        }
       }
     }
   }
@@ -214,7 +218,20 @@ export default function Analyze() {
 
           {showAdvanced && (
             <div className="px-5 pb-5 border-t border-border space-y-4 pt-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-foreground block mb-1.5">Relevant Brand Terms</label>
+                  <p className="text-xs text-muted-foreground mb-2">Press Enter or comma to add. The AI will mark these as relevant.</p>
+                  <TagInput
+                    value={relevantBrandTerms}
+                    onChange={(terms) => {
+                      setRelevantBrandTerms(terms);
+                      setValue("relevantBrandTerms", terms.join(", "));
+                    }}
+                    placeholder="your brand name..."
+                    data-testid="tag-input-relevant-brands"
+                  />
+                </div>
                 <div>
                   <label className="text-sm font-medium text-foreground block mb-1.5">Competitor Brands</label>
                   <p className="text-xs text-muted-foreground mb-2">Press Enter or comma to add. These terms will be flagged as negatives.</p>
