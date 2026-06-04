@@ -120,6 +120,11 @@ export interface SearchTermResult {
      * @nullable
      */
   outOfAreaLocation?: string | null;
+  /**
+     * AI-assessed relevance score from 0-100. Low scores (0-30) = broad/borderline terms. High scores (70-100) = strong match with active keywords.
+     * @nullable
+     */
+  relevanceScore?: number | null;
 }
 
 export type AnalysisStatus = typeof AnalysisStatus[keyof typeof AnalysisStatus];

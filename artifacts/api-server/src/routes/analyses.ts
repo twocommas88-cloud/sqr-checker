@@ -209,22 +209,23 @@ router.post("/analyses/:id/chat", async (req, res): Promise<void> => {
 
   const existingResults = JSON.parse(row.results) as SearchTermResult[];
 
-  const prompt = `You are a Google Ads search query analysis expert. Here are the current analysis results:
+  const prompt = `You are a Google Ads search query analysis expert. Here are the current analysis results (${existingResults.length} terms):
 
-${JSON.stringify(existingResults.slice(0, 50), null, 2)}
+${JSON.stringify(existingResults, null, 2)}
 
 The user wants to modify these results with the following instruction:
 """${message}"""
 ${additionalContext ? `\nAdditional context: ${additionalContext}\n` : ""}
 
-Please return the COMPLETE updated results array (all terms, not just the changed ones) as a valid JSON array in the same format. Only modify the fields that the user's request affects. Keep all other fields unchanged.
+Please return the COMPLETE updated results array (ALL ${existingResults.length} terms, not just the changed ones) as a valid JSON array in the same format. Only modify the fields that the user's request affects. Keep all other fields unchanged.
 
 Rules:
 - relevance must be exactly "Relevant" or "Irrelevant"
 - addLevel must be "Campaign", "Ad Group", or "None"
 - addAsKeyword must be true only when the term has conversions > 0
 - isCompetitor must be true only for competitor brand terms
-- Keep all campaignName, adGroupName, impressions, clicks, conversions, cost, searchTerm unchanged unless the user specifically asks to modify them.
+- relevanceScore: keep the existing score unchanged unless the user's request specifically changes the relevance of a term
+- Keep all campaignName, adGroupName, impressions, clicks, conversions, cost, searchTerm, relevanceScore unchanged unless the user specifically asks to modify them.
 
 Return ONLY the JSON array, no markdown, no explanation.`;
 

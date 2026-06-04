@@ -18,6 +18,8 @@ interface Filters {
   addLevel: AddLevel;
   addAsKeyword: "" | "yes" | "no";
   isCompetitor: "" | "yes" | "no";
+  hasNgram: "" | "yes" | "no";
+  outOfArea: "" | "yes" | "no";
   search: string;
 }
 
@@ -37,6 +39,7 @@ type AnalysisResult = {
   isCompetitor: boolean;
   matchedKeyword?: string | null;
   outOfAreaLocation?: string | null;
+  relevanceScore?: number | null;
 };
 
 // ── N-gram extraction ────────────────────────────────────────────────────────
@@ -313,14 +316,14 @@ export default function Results() {
   }, [analysis?.status, id, queryClient]);
 
   const [filters, setFilters] = useState<Filters>({
-    relevance: "", addLevel: "", addAsKeyword: "", isCompetitor: "", search: "",
+    relevance: "", addLevel: "", addAsKeyword: "", isCompetitor: "", hasNgram: "", outOfArea: "", search: "",
   });
 
   function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((f) => ({ ...f, [key]: value }));
   }
   function clearFilters() {
-    setFilters({ relevance: "", addLevel: "", addAsKeyword: "", isCompetitor: "", search: "" });
+    setFilters({ relevance: "", addLevel: "", addAsKeyword: "", isCompetitor: "", hasNgram: "", outOfArea: "", search: "" });
   }
 
   function handleRefresh() {
@@ -388,6 +391,11 @@ export default function Results() {
     if (filters.addAsKeyword === "no" && r.addAsKeyword) return false;
     if (filters.isCompetitor === "yes" && !r.isCompetitor) return false;
     if (filters.isCompetitor === "no" && r.isCompetitor) return false;
+    const matchedNgram = r.relevance === "Irrelevant" ? findMatchingNgram(r.searchTerm, ngrams) : null;
+    if (filters.hasNgram === "yes" && !matchedNgram) return false;
+    if (filters.hasNgram === "no" && matchedNgram) return false;
+    if (filters.outOfArea === "yes" && !r.outOfAreaLocation) return false;
+    if (filters.outOfArea === "no" && r.outOfAreaLocation) return false;
     if (filters.search && !r.searchTerm.toLowerCase().includes(filters.search.toLowerCase())) return false;
     return true;
   });
@@ -664,6 +672,16 @@ export default function Results() {
               <option value="yes">Competitors only</option>
               <option value="no">Non-competitors</option>
             </select>
+            <select value={filters.hasNgram} onChange={(e) => setFilter("hasNgram", e.target.value as "" | "yes" | "no")} className="border border-input rounded-md px-3 py-1.5 text-sm bg-card outline-none">
+              <option value="">Neg. N-gram?</option>
+              <option value="yes">Has N-gram</option>
+              <option value="no">No N-gram</option>
+            </select>
+            <select value={filters.outOfArea} onChange={(e) => setFilter("outOfArea", e.target.value as "" | "yes" | "no")} className="border border-input rounded-md px-3 py-1.5 text-sm bg-card outline-none">
+              <option value="">Out of Area?</option>
+              <option value="yes">Out of Area</option>
+              <option value="no">In Area</option>
+            </select>
             {hasFilters && (
               <button onClick={clearFilters} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" data-testid="button-clear-filters">
                 <X className="w-3.5 h-3.5" /> Clear
@@ -684,11 +702,12 @@ export default function Results() {
                       <th className="text-right px-3 py-3 w-[60px]">Clicks</th>
                       <th className="text-right px-3 py-3 w-[60px]">Conv.</th>
                       <th className="text-right px-3 py-3 w-[60px]">Cost</th>
+                      <th className="text-left px-3 py-3 w-[80px]">Score</th>
                       <th className="text-left px-3 py-3 w-[90px]">Relevance</th>
                       <th className="text-left px-3 py-3 w-[160px]">Reason</th>
                       <th className="text-left px-3 py-3 w-[90px]">Add Level</th>
                       <th className="text-left px-3 py-3 w-[70px]">New KW?</th>
-                      <th className="text-left px-3 py-3 w-[110px]">Ad Group</th>
+                      <th className="text-left px-3 py-3 w-[110px]">Add as Neg</th>
                       <th className="text-left px-3 py-3 w-[70px]">Comp.</th>
                       <th className="text-left px-3 py-3 w-[100px]">Neg. N-gram</th>
                       <th className="text-left px-3 py-3 w-[100px]">Out-of-Area</th>
@@ -714,6 +733,17 @@ export default function Results() {
                           <td className="px-3 py-2.5 text-right text-muted-foreground">{r.conversions ?? "—"}</td>
                           <td className="px-3 py-2.5 text-right text-muted-foreground">{r.cost != null ? `$${r.cost.toFixed(2)}` : "—"}</td>
                           <td className="px-3 py-2.5">
+                            {r.relevanceScore != null ? (
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                                r.relevanceScore >= 70 ? "bg-emerald-100 text-emerald-700" :
+                                r.relevanceScore >= 50 ? "bg-yellow-100 text-yellow-700" :
+                                "bg-red-100 text-red-700"
+                              }`} title={`Relevance score: ${r.relevanceScore}/100`}>
+                                {r.relevanceScore}
+                              </span>
+                            ) : <span className="text-muted-foreground text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5">
                             <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
                               r.relevance === "Relevant" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
                             }`} data-testid={`relevance-${i}`}>
@@ -737,8 +767,14 @@ export default function Results() {
                               {r.addAsKeyword ? "Yes" : "No"}
                             </span>
                           </td>
-                          <td className="px-3 py-2.5 text-xs text-muted-foreground" data-testid={`ad-group-${i}`}>
-                            {r.suggestedAdGroup ?? "—"}
+                          <td className="px-3 py-2.5">
+                            {r.addLevel !== "None" ? (
+                              <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                                r.addLevel === "Campaign" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"
+                              }`}>
+                                {r.addLevel}
+                              </span>
+                            ) : <span className="text-muted-foreground text-xs">—</span>}
                           </td>
                           <td className="px-3 py-2.5">
                             {r.isCompetitor ? (

@@ -383,6 +383,9 @@ components:
         outOfAreaLocation:
           type: ["string", "null"]
           description: The specific location word/phrase in the search term that is outside the target service area
+        relevanceScore:
+          type: ["number", "null"]
+          description: AI-assessed relevance score from 0-100. Low scores (0-30) = broad/borderline terms. High scores (70-100) = strong match with active keywords.
 
     Analysis:
       type: object

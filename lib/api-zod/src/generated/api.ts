@@ -207,7 +207,8 @@ export const GetAnalysisResponse = zod.object({
   "suggestedAdGroup": zod.string().nullable(),
   "isCompetitor": zod.boolean(),
   "matchedKeyword": zod.string().nullish(),
-  "outOfAreaLocation": zod.string().nullish().describe('The specific location word\/phrase in the search term that is outside the target service area')
+  "outOfAreaLocation": zod.string().nullish().describe('The specific location word\/phrase in the search term that is outside the target service area'),
+  "relevanceScore": zod.number().nullish().describe('AI-assessed relevance score from 0-100. Low scores (0-30) = broad\/borderline terms. High scores (70-100) = strong match with active keywords.')
 })),
   "errorMessage": zod.string().nullish(),
   "createdAt": zod.string()
@@ -258,7 +259,8 @@ export const ChatWithAnalysisResponse = zod.object({
   "suggestedAdGroup": zod.string().nullable(),
   "isCompetitor": zod.boolean(),
   "matchedKeyword": zod.string().nullish(),
-  "outOfAreaLocation": zod.string().nullish().describe('The specific location word\/phrase in the search term that is outside the target service area')
+  "outOfAreaLocation": zod.string().nullish().describe('The specific location word\/phrase in the search term that is outside the target service area'),
+  "relevanceScore": zod.number().nullish().describe('AI-assessed relevance score from 0-100. Low scores (0-30) = broad\/borderline terms. High scores (70-100) = strong match with active keywords.')
 })),
   "errorMessage": zod.string().nullish(),
   "createdAt": zod.string()

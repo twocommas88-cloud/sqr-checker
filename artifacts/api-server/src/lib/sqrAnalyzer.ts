@@ -26,6 +26,7 @@ export interface SearchTermResult {
   isCompetitor: boolean;
   matchedKeyword?: string | null;
   outOfAreaLocation?: string | null;
+  relevanceScore?: number | null;
 }
 
 export interface AnalysisOptions {
@@ -255,6 +256,8 @@ LOCATION MATCHING RULES — READ CAREFULLY:
 - The location list above may include: city names, state names, state abbreviations (e.g., "FL" means Florida), county names, ZIP codes, or radius descriptions (e.g., "50 miles around Austin", "within 30 miles of Dallas").
 - When matching locations, you MUST be flexible with: abbreviations, misspellings, partial matches, and common variants.
   Examples: "FL" matches "Florida", "florida", "floridas"; "KY" matches "Kentucky", "kentucky", "kentuckys"; "NYC" matches "New York", "new york city", "ny".
+  IMPORTANT: The locations list may be entered with spaces only (e.g., "FL KY Nashville"). When the list is space-separated, treat each word/abbreviation as a separate location. "FL" means the entire state of Florida. "KY" means the entire state of Kentucky.
+- If a state abbreviation is in the target list (e.g., "FL"), any city or location KNOWN to be in that state is ALSO considered in the target area. For example: "FL" is in the target list, and "Tampa" is a city in Florida, so "Tampa" is in the target area. "KY" is in the target list, and "Louisville" is a city in Kentucky, so "Louisville" is in the target area.
 - Search terms that mention a specific location OUTSIDE the target area → Irrelevant (addLevel: "Campaign"), reason: "Outside target service area", and set outOfAreaLocation to the location name found.
 - Search terms with NO location or a location IN the target area → treat as geographically relevant (location alone does not make a term irrelevant).
 - Generic location terms (e.g. "near me", "local", "close by") → geographically relevant.
@@ -301,7 +304,16 @@ Search terms to analyze:
 ${termsJson}
 
 Return ONLY a valid JSON array with exactly ${terms.length} objects, one per search term, in this exact format — no markdown, no explanation:
-[{"searchTerm":"...","relevance":"Relevant","reason":"...","addLevel":"None","addAsKeyword":false,"suggestedAdGroup":null,"isCompetitor":false,"matchedKeyword":"...","outOfAreaLocation":null}]
+[{"searchTerm":"...","relevance":"Relevant","reason":"...","addLevel":"None","addAsKeyword":false,"suggestedAdGroup":null,"isCompetitor":false,"matchedKeyword":"...","outOfAreaLocation":null,"relevanceScore":85}]
+
+relevanceScore field: Assess how closely this search term matches the business's core offerings (0-100). Use this scale:
+- 90-100: Exact match or highly specific intent (e.g., "emergency plumbing repair" for a plumbing company)
+- 70-89: Strong match, clear service intent (e.g., "leak repair" for a plumber)
+- 50-69: Moderate match, some ambiguity (e.g., "pipe" for a plumber — could be a pipe supply store)
+- 30-49: Weak match, borderline or broad (e.g., "water" for a plumber — too broad, could be anything water-related)
+- 0-29: Very weak or irrelevant match (e.g., "how to paint a room" for a plumber)
+- For "Relevant" terms: score should be 50-100 (higher for more specific intent)
+- For "Irrelevant" terms: score should be 0-49 (lower for clearer irrelevance)
 
 CRITICAL RULES FOR JSON OUTPUT:
 - The "relevance" field MUST be exactly "Relevant" or "Irrelevant" — no other text, no sentence, no explanation. Just the single word.
@@ -334,6 +346,7 @@ outOfAreaLocation: If the term is flagged as outside the target service area, se
     isCompetitor: boolean;
     matchedKeyword: string | null;
     outOfAreaLocation: string | null;
+    relevanceScore: number | null;
   }>;
 
   return parsed.map((item, i) => ({
@@ -348,6 +361,7 @@ outOfAreaLocation: If the term is flagged as outside the target service area, se
     isCompetitor: item.isCompetitor ?? false,
     matchedKeyword: item.matchedKeyword ?? null,
     outOfAreaLocation: item.outOfAreaLocation ?? null,
+    relevanceScore: item.relevanceScore ?? null,
   }));
 }
 
