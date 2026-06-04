@@ -29,6 +29,8 @@ export interface SearchTermResult {
   relevanceScore?: number | null;
   /** Suggested negative term — the specific irrelevant word/phrase to add as a negative keyword (e.g., "how to" or "careers"), NOT the full search term. Only set when the term contains a brand name + an irrelevant modifier. */
   suggestedNegativeTerm?: string | null;
+  /** English translation of the search term if it is not in English. Used for relevance analysis. */
+  translation?: string | null;
 }
 
 export interface AnalysisOptions {
@@ -115,6 +117,70 @@ function safeNum(s: string | undefined): number | null {
   const cleaned = s.replace(/[%,$,]/g, "").trim();
   const n = parseFloat(cleaned);
   return isNaN(n) ? null : n;
+}
+
+/**
+ * Escape unescaped double quotes inside JSON string values.
+ * Walks the JSON character by character, tracking whether we're inside a string,
+ * and escapes any unescaped quotes that appear inside string values.
+ */
+function escapeUnescapedQuotes(json: string): string {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+  let lastNonStringChar = "";
+
+  for (let i = 0; i < json.length; i++) {
+    const ch = json[i];
+
+    if (escaped) {
+      result += ch;
+      escaped = false;
+      continue;
+    }
+
+    if (ch === "\\") {
+      result += ch;
+      escaped = true;
+      continue;
+    }
+
+    if (ch === '"') {
+      if (inString) {
+        // Look ahead: is this quote followed by a JSON structural character?
+        // Valid JSON structure: after a key name, we see ':'
+        // After a value, we see ',' or '}' or ']'
+        const next = json[i + 1];
+        const nextNonSpace = next === " " || next === "\n" || next === "\t" ? json[i + 2] : next;
+        // A closing quote is followed by structural end-of-value chars OR ':' (end of key name)
+        if (
+          next === undefined ||
+          next === "," ||
+          next === "}" ||
+          next === "]" ||
+          next === " " ||
+          next === "\n" ||
+          next === "\t" ||
+          next === ":"
+        ) {
+          // Closing quote
+          result += ch;
+          inString = false;
+        } else {
+          // Unescaped quote inside string value — escape it
+          result += '\\"';
+        }
+      } else {
+        result += ch;
+        inString = true;
+      }
+      continue;
+    }
+
+    result += ch;
+  }
+
+  return result;
 }
 
 /**
@@ -326,7 +392,14 @@ Search terms to analyze:
 ${termsJson}
 
 Return ONLY a valid JSON array with exactly ${terms.length} objects, one per search term, in this exact format — no markdown, no explanation:
-[{"searchTerm":"...","relevance":"Relevant","reason":"...","addLevel":"None","addAsKeyword":false,"suggestedAdGroup":null,"isCompetitor":false,"matchedKeyword":"...","outOfAreaLocation":null,"relevanceScore":85,"suggestedNegativeTerm":null}]
+[{"searchTerm":"...","translation":"English translation if non-English, otherwise null","relevance":"Relevant","reason":"...","addLevel":"None","addAsKeyword":false,"suggestedAdGroup":null,"isCompetitor":false,"matchedKeyword":"...","outOfAreaLocation":null,"relevanceScore":85,"suggestedNegativeTerm":null}]
+
+TRANSLATION RULES:
+- If the search term is in English, set translation to null.
+- If the search term is in ANY other language, provide the English translation of the term. The translation should be the literal meaning of the search term, not an interpretation.
+- Use the English translation (when available) to determine relevance against the active keywords.
+- For example: "пломбир москва" → translation: "plumber moscow" → relevance: Irrelevant (out of area)
+- Non-English terms must be evaluated using their English translation to determine if they match the business services.
 
 relevanceScore field: Assess how closely this search term matches the business's core offerings (0-100). Use this scale:
 - 90-100: Exact match or highly specific intent (e.g., "emergency plumbing repair" for a plumbing company)
@@ -400,16 +473,36 @@ outOfAreaLocation: If the term is flagged as outside the target service area, se
     outOfAreaLocation: string | null;
     relevanceScore: number | null;
     suggestedNegativeTerm: string | null;
+    translation: string | null;
   }>;
 
   try {
     parsed = JSON.parse(jsonText);
   } catch (err) {
-    // Try to fix common AI JSON mistakes: trailing commas, unescaped quotes
-    const cleaned = jsonText
-      .replace(/,(\s*[\}\]])/g, "$1")          // remove trailing commas
-      .replace(/\n/g, " ")                     // remove newlines
-      .replace(/\t/g, " ");                    // remove tabs
+    // Aggressive JSON repair for AI-generated malformed JSON
+    let cleaned = jsonText;
+
+    // 1. Remove trailing commas before } or ]
+    cleaned = cleaned.replace(/,(\s*[\}\]])/g, "$1");
+
+    // 2. Remove newlines and tabs inside strings (replace with space)
+    cleaned = cleaned.replace(/\n/g, " ");
+    cleaned = cleaned.replace(/\t/g, " ");
+
+    // 3. Remove control characters (0x00-0x1F except tab/newline which we already handled)
+    cleaned = cleaned.replace(/[\x00-\x08\x0b-\x0c\x0e-\x1f]/g, "");
+
+    // 4. Fix unescaped quotes inside string values using a proper tokenizer
+    //    This is the most reliable way to handle quotes inside JSON strings
+    cleaned = escapeUnescapedQuotes(cleaned);
+
+    // 5. Remove any BOM or zero-width characters
+    cleaned = cleaned.replace(/\ufeff/g, "");
+
+    // 6. If the AI wrapped the JSON in markdown code blocks, remove them
+    cleaned = cleaned.replace(/^```json\s*/i, "");
+    cleaned = cleaned.replace(/```\s*$/i, "");
+
     try {
       parsed = JSON.parse(cleaned);
     } catch {
@@ -422,7 +515,27 @@ outOfAreaLocation: If the term is flagged as outside the target service area, se
           throw new Error("AI response is not valid JSON");
         }
       } catch {
-        throw new Error("AI response is not valid JSON after all attempts: " + (err as Error).message);
+        // Last resort: try to parse object-by-object and reconstruct
+        try {
+          const objects: Array<Record<string, unknown>> = [];
+          const objRegex = /\{[^{}]*\}/g;
+          let m: RegExpExecArray | null;
+          while ((m = objRegex.exec(cleaned)) !== null) {
+            try {
+              const obj = JSON.parse(m[0]);
+              objects.push(obj);
+            } catch {
+              // Skip malformed individual objects
+            }
+          }
+          if (objects.length > 0) {
+            parsed = objects as unknown as typeof parsed;
+          } else {
+            throw new Error("AI response is not valid JSON after all attempts: " + (err as Error).message);
+          }
+        } catch {
+          throw new Error("AI response is not valid JSON after all attempts: " + (err as Error).message);
+        }
       }
     }
   }
@@ -440,6 +553,8 @@ outOfAreaLocation: If the term is flagged as outside the target service area, se
     matchedKeyword: item.matchedKeyword ?? null,
     outOfAreaLocation: item.outOfAreaLocation ?? null,
     relevanceScore: item.relevanceScore ?? null,
+    suggestedNegativeTerm: item.suggestedNegativeTerm ?? null,
+    translation: item.translation ?? null,
   }));
 }
 

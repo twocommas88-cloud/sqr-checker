@@ -42,4 +42,9 @@ export interface SearchTermResult {
      * @nullable
      */
   suggestedNegativeTerm?: string | null;
+  /**
+     * English translation of the search term if it is not in English. Used for relevance analysis against the active keywords.
+     * @nullable
+     */
+  translation?: string | null;
 }

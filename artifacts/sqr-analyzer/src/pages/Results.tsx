@@ -41,6 +41,7 @@ type AnalysisResult = {
   outOfAreaLocation?: string | null;
   relevanceScore?: number | null;
   suggestedNegativeTerm?: string | null;
+  translation?: string | null;
 };
 
 // ── N-gram extraction ────────────────────────────────────────────────────────
@@ -191,9 +192,10 @@ function findMatchingNgram(term: string, ngrams: string[]): string | null {
 // ── CSV download ─────────────────────────────────────────────────────────────
 
 function downloadCSV(results: AnalysisResult[], name: string) {
-  const headers = ["Search Term","Relevance","Reason","Impressions","Clicks","Conversions","Cost","Score","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Suggested Negative Term","Out-of-Area Location","Campaign Name","Ad Group Name"];
+  const headers = ["Search Term","Translation","Relevance","Reason","Impressions","Clicks","Conversions","Cost","Score","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Suggested Negative Term","Out-of-Area Location","Campaign Name","Ad Group Name"];
   const rows = results.map((r) => [
     `"${r.searchTerm.replace(/"/g, '""')}"`,
+    r.translation ? `"${r.translation.replace(/"/g, '""')}"` : "",
     r.relevance,
     `"${r.reason.replace(/"/g, '""')}"`,
     r.impressions ?? "",
@@ -222,9 +224,10 @@ function downloadCSV(results: AnalysisResult[], name: string) {
 }
 
 async function copyForSheets(results: AnalysisResult[], name: string): Promise<void> {
-  const headers = ["Search Term","Relevance","Reason","Impressions","Clicks","Conversions","Cost","Score","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Suggested Negative Term","Out-of-Area Location","Campaign Name","Ad Group Name"];
+  const headers = ["Search Term","Translation","Relevance","Reason","Impressions","Clicks","Conversions","Cost","Score","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Suggested Negative Term","Out-of-Area Location","Campaign Name","Ad Group Name"];
   const rows = results.map((r) => [
     r.searchTerm,
+    r.translation ?? "",
     r.relevance,
     r.reason,
     r.impressions ?? "",
@@ -729,6 +732,7 @@ export default function Results() {
                   <thead className="bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     <tr>
                       <th className="text-left px-4 py-3 w-[220px] min-w-[200px] sticky left-0 bg-muted/50 z-10">Search Term</th>
+                      <th className="text-left px-3 py-3 w-[140px]">Translation</th>
                       <th className="text-left px-3 py-3 w-[90px]">Relevance</th>
                       <th className="text-left px-3 py-3 w-[160px]">Reason</th>
                       <th className="text-right px-3 py-3 w-[70px]">Impr.</th>
@@ -749,7 +753,7 @@ export default function Results() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filtered.length === 0 ? (
-                      <tr><td colSpan={16} className="px-4 py-10 text-center text-muted-foreground text-sm">No results match your filters</td></tr>
+                      <tr><td colSpan={17} className="px-4 py-10 text-center text-muted-foreground text-sm">No results match your filters</td></tr>
                     ) : filtered.map((r, i) => {
                       const matchedNgram = r.relevance === "Irrelevant" ? findMatchingNgram(r.searchTerm, ngrams) : null;
                       return (
@@ -759,6 +763,13 @@ export default function Results() {
                             {r.matchedKeyword && (
                               <span className="text-xs text-muted-foreground truncate block" title={r.matchedKeyword}>→ {r.matchedKeyword}</span>
                             )}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {r.translation ? (
+                              <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-medium" title={`English translation: ${r.translation}`}>
+                                {r.translation}
+                              </span>
+                            ) : <span className="text-muted-foreground text-xs">—</span>}
                           </td>
                           <td className="px-3 py-2.5">
                             <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
