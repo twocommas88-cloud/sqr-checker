@@ -757,12 +757,12 @@ export default function Results() {
                       <th className="text-left px-4 py-3 w-[220px] min-w-[200px] sticky left-0 bg-muted/50 z-10">Search Term</th>
                       <th className="text-left px-3 py-3 w-[140px]">Translation</th>
                       <th className="text-left px-3 py-3 w-[90px]">Relevance</th>
+                      <th className="text-left px-3 py-3 w-[80px]">Score</th>
                       <th className="text-left px-3 py-3 w-[160px]">Reason</th>
                       <th className="text-right px-3 py-3 w-[70px]">Impr.</th>
                       <th className="text-right px-3 py-3 w-[60px]">Clicks</th>
                       <th className="text-right px-3 py-3 w-[60px]">Conv.</th>
                       <th className="text-right px-3 py-3 w-[60px]">Cost</th>
-                      <th className="text-left px-3 py-3 w-[80px]">Score</th>
                       <th className="text-left px-3 py-3 w-[90px]">Add Level</th>
                       <th className="text-left px-3 py-3 w-[70px]">New KW?</th>
                       <th className="text-left px-3 py-3 w-[110px]">Add as Neg</th>
@@ -801,13 +801,6 @@ export default function Results() {
                               {r.relevance}
                             </span>
                           </td>
-                          <td className="px-3 py-2.5 text-muted-foreground text-xs w-[160px]">
-                            <span className="truncate block" title={r.reason}>{r.reason}</span>
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-muted-foreground">{r.impressions?.toLocaleString() ?? "—"}</td>
-                          <td className="px-3 py-2.5 text-right text-muted-foreground">{r.clicks?.toLocaleString() ?? "—"}</td>
-                          <td className="px-3 py-2.5 text-right text-muted-foreground">{r.conversions ?? "—"}</td>
-                          <td className="px-3 py-2.5 text-right text-muted-foreground">{r.cost != null ? `$${r.cost.toFixed(2)}` : "—"}</td>
                           <td className="px-3 py-2.5">
                             {r.relevanceScore != null ? (
                               <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -819,6 +812,13 @@ export default function Results() {
                               </span>
                             ) : <span className="text-muted-foreground text-xs">—</span>}
                           </td>
+                          <td className="px-3 py-2.5 text-muted-foreground text-xs w-[160px]">
+                            <span className="truncate block" title={r.reason}>{r.reason}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-muted-foreground">{r.impressions?.toLocaleString() ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-right text-muted-foreground">{r.clicks?.toLocaleString() ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-right text-muted-foreground">{r.conversions ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-right text-muted-foreground">{r.cost != null ? `$${r.cost.toFixed(2)}` : "—"}</td>
                           <td className="px-3 py-2.5">
                             {r.addLevel !== "None" ? (
                               <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
