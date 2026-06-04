@@ -137,6 +137,7 @@ export const ListAnalysesResponseItem = zod.object({
   "irrelevantCount": zod.number(),
   "newKeywordCount": zod.number().optional(),
   "competitorCount": zod.number().optional(),
+  "explanation": zod.string().optional().describe('Explanation of the last AI chat modification, if any'),
   "createdAt": zod.string()
 })
 export const ListAnalysesResponse = zod.array(ListAnalysesResponseItem)
@@ -211,6 +212,7 @@ export const GetAnalysisResponse = zod.object({
   "relevanceScore": zod.number().nullish().describe('AI-assessed relevance score from 0-100. Low scores (0-30) = broad\/borderline terms. High scores (70-100) = strong match with active keywords.')
 })),
   "errorMessage": zod.string().nullish(),
+  "explanation": zod.string().nullish().describe('Explanation of the last AI chat modification, if any'),
   "createdAt": zod.string()
 })
 
@@ -263,6 +265,7 @@ export const ChatWithAnalysisResponse = zod.object({
   "relevanceScore": zod.number().nullish().describe('AI-assessed relevance score from 0-100. Low scores (0-30) = broad\/borderline terms. High scores (70-100) = strong match with active keywords.')
 })),
   "errorMessage": zod.string().nullish(),
+  "explanation": zod.string().nullish().describe('Explanation of the last AI chat modification, if any'),
   "createdAt": zod.string()
 })
 

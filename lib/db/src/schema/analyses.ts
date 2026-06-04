@@ -24,6 +24,7 @@ export const analyses = pgTable("analyses", {
   competitorCount: integer("competitor_count").notNull().default(0),
   results: text("results").notNull().default("[]"),
   errorMessage: text("error_message"),
+  explanation: text("explanation"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

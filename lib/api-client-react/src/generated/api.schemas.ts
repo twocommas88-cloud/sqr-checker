@@ -174,6 +174,11 @@ export interface Analysis {
   results: SearchTermResult[];
   /** @nullable */
   errorMessage?: string | null;
+  /**
+     * Explanation of the last AI chat modification, if any
+     * @nullable
+     */
+  explanation?: string | null;
   createdAt: string;
 }
 
@@ -198,6 +203,8 @@ export interface AnalysisSummary {
   irrelevantCount: number;
   newKeywordCount?: number;
   competitorCount?: number;
+  /** Explanation of the last AI chat modification, if any */
+  explanation?: string;
   createdAt: string;
 }
 

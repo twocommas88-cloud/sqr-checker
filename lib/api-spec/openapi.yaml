@@ -445,6 +445,9 @@ components:
             $ref: "#/components/schemas/SearchTermResult"
         errorMessage:
           type: ["string", "null"]
+        explanation:
+          type: ["string", "null"]
+          description: Explanation of the last AI chat modification, if any
         createdAt:
           type: string
 
@@ -471,6 +474,9 @@ components:
           type: integer
         competitorCount:
           type: integer
+        explanation:
+          type: string
+          description: Explanation of the last AI chat modification, if any
         createdAt:
           type: string
 

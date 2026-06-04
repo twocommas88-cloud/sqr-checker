@@ -72,6 +72,7 @@ function parseSummaryRow(row: typeof analyses.$inferSelect) {
     irrelevantCount: row.irrelevantCount,
     newKeywordCount: row.newKeywordCount,
     competitorCount: row.competitorCount,
+    explanation: row.explanation ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -258,26 +259,36 @@ The user wants to modify ALL ${existingResults.length} results with the followin
 ${additionalContext ? `\nAdditional context: ${additionalContext}\n` : ""}
 
 Please return a JSON object with two fields:
-1. "explanation": A brief explanation of what changes will be made (1-2 sentences)
+1. "explanation": A brief explanation of what changes will be made (1-2 sentences). Be specific about the match terms.
 2. "rules": An array of rule objects. Each rule must have:
-   - "field": Which field to modify ("relevance", "addLevel", "isCompetitor", "addAsKeyword")
-   - "value": The new value to set
+   - "field": Which field to modify ("relevance", "addLevel", "isCompetitor", "addAsKeyword", "outOfAreaLocation")
+   - "value": The new value to set (for outOfAreaLocation, use null to clear it, or a string to set it)
    - "match": One of:
      - { "type": "contains", "terms": ["word1", "word2"] } — applies to terms containing ANY of these words
      - { "type": "exact", "terms": ["exact term"] } — applies to exact matches
      - { "type": "all" } — applies to ALL terms
 
+IMPORTANT RULES:
+- When setting relevance to "Relevant", also set addLevel to "None" and outOfAreaLocation to null if the term was previously flagged as out-of-area.
+- When setting relevance to "Irrelevant", you can set addLevel to "Campaign" or "Ad Group".
+- The match terms should be case-insensitive and match substrings. For example, to match terms containing "Georgia" or "GA", use terms: ["georgia", " ga"] or ["georgia", "ga"].
+
 Example rules:
 [
   {
     "field": "relevance",
-    "value": "Irrelevant",
-    "match": { "type": "contains", "terms": ["how to", "diy"] }
+    "value": "Relevant",
+    "match": { "type": "contains", "terms": ["georgia", "ga"] }
   },
   {
-    "field": "isCompetitor",
-    "value": true,
-    "match": { "type": "contains", "terms": ["nike", "adidas"] }
+    "field": "addLevel",
+    "value": "None",
+    "match": { "type": "contains", "terms": ["georgia", "ga"] }
+  },
+  {
+    "field": "outOfAreaLocation",
+    "value": null,
+    "match": { "type": "contains", "terms": ["georgia", "ga"] }
   }
 ]
 
@@ -356,6 +367,10 @@ Return ONLY the JSON object, no markdown, no explanation outside the JSON.`;
           updated.isCompetitor = rule.value;
         } else if (rule.field === "addAsKeyword" && typeof rule.value === "boolean") {
           updated.addAsKeyword = rule.value;
+        } else if (rule.field === "outOfAreaLocation") {
+          updated.outOfAreaLocation = rule.value === null ? null : (typeof rule.value === "string" ? rule.value : null);
+        } else if (rule.field === "reason" && typeof rule.value === "string") {
+          updated.reason = rule.value;
         }
       }
     }
@@ -375,6 +390,7 @@ Return ONLY the JSON object, no markdown, no explanation outside the JSON.`;
       irrelevantCount,
       newKeywordCount,
       competitorCount,
+      explanation: parsedResponse.explanation ?? null,
     })
     .where(eq(analyses.id, row.id));
 

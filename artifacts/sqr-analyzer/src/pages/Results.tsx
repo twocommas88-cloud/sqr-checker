@@ -307,6 +307,15 @@ export default function Results() {
   const [chatMessage, setChatMessage] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
 
+  interface ChatMessage {
+    role: "user" | "ai";
+    text: string;
+    explanation?: string;
+    termsModified?: number;
+    timestamp: Date;
+  }
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+
   useEffect(() => {
     if (!analysis || analysis.status === "completed" || analysis.status === "failed") return;
     const interval = setInterval(() => {
@@ -827,9 +836,37 @@ export default function Results() {
 
           {chatOpen && (
             <div className="px-8 pb-6 space-y-4">
-              <p className="text-xs text-muted-foreground">
-                Ask the AI to modify the analysis results. For example: "Add rule: flag all terms with 'how to' as irrelevant" or "Make all terms containing 'free' as competitors."
-              </p>
+              {/* Chat history */}
+              {chatHistory.length > 0 && (
+                <div className="space-y-3 max-h-64 overflow-y-auto py-2">
+                  {chatHistory.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted border border-border"
+                      }`}>
+                        {msg.role === "user" ? (
+                          <p>{msg.text}</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {msg.explanation && (
+                              <p className="font-medium">{msg.explanation}</p>
+                            )}
+                            {msg.termsModified != null && (
+                              <p className="text-xs text-muted-foreground">
+                                {msg.termsModified} terms modified
+                              </p>
+                            )}
+                            {!msg.explanation && <p>{msg.text}</p>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -841,7 +878,7 @@ export default function Results() {
                       handleChatSend();
                     }
                   }}
-                  placeholder="e.g., Add rule: flag all terms with 'how to' as irrelevant"
+                  placeholder="e.g., Make all terms with Georgia or GA as Relevant"
                   className="flex-1 rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
                   disabled={chatWithAnalysis.isPending}
                 />
@@ -867,15 +904,34 @@ export default function Results() {
 
   function handleChatSend() {
     if (!chatMessage.trim() || !analysis) return;
+    const userMsg = chatMessage.trim();
+    setChatHistory((prev) => [...prev, { role: "user", text: userMsg, timestamp: new Date() }]);
+    setChatMessage("");
     chatWithAnalysis.mutate(
-      { id, data: { message: chatMessage.trim() } },
+      { id, data: { message: userMsg } },
       {
-        onSuccess: () => {
-          toast({ title: "Analysis updated", description: "The AI has modified your results." });
-          setChatMessage("");
+        onSuccess: (data) => {
+          const termsModified = data?.relevantCount != null || data?.irrelevantCount != null
+            ? (analysis?.results?.length ?? 0) - (data?.results?.length ?? 0)
+            : undefined;
+          setChatHistory((prev) => [
+            ...prev,
+            {
+              role: "ai",
+              text: userMsg,
+              explanation: data?.explanation ?? "Results updated.",
+              termsModified: termsModified != null ? Math.abs(termsModified) : undefined,
+              timestamp: new Date(),
+            },
+          ]);
           queryClient.invalidateQueries({ queryKey: getGetAnalysisQueryKey(id) });
+          toast({ title: "Analysis updated", description: data?.explanation ?? "The AI has modified your results." });
         },
         onError: () => {
+          setChatHistory((prev) => [
+            ...prev,
+            { role: "ai", text: "Sorry, I couldn't process that request. Please try again.", timestamp: new Date() },
+          ]);
           toast({ title: "Chat failed", description: "Could not modify the analysis. Try again.", variant: "destructive" });
         },
       }
