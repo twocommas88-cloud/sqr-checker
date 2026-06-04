@@ -17,6 +17,11 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _sessionIdGetter: (() => string | null) | null = null;
+
+export function setSessionIdGetter(getter: (() => string | null) | null): void {
+  _sessionIdGetter = getter;
+}
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -336,6 +341,14 @@ export async function customFetch<T = unknown>(
   }
 
   const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
+
+  // Attach session ID when a getter is configured
+  if (_sessionIdGetter && !headers.has("x-session-id")) {
+    const sessionId = _sessionIdGetter();
+    if (sessionId) {
+      headers.set("x-session-id", sessionId);
+    }
+  }
 
   if (
     typeof init.body === "string" &&

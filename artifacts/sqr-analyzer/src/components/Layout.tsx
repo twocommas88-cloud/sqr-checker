@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Search, History, Settings, ChevronRight } from "lucide-react";
+import { Search, History, Settings, ChevronRight, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -47,7 +47,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="px-5 py-4 border-t border-sidebar-border">
+        <div className="px-5 py-4 border-t border-sidebar-border space-y-2">
+          <button
+            onClick={() => {
+              if (confirm("Start a new session? Your current analyses and rule sets will be hidden (not deleted).")) {
+                localStorage.removeItem("sqr_session_id");
+                window.location.reload();
+              }
+            }}
+            className="flex items-center gap-2 text-xs text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
+            title="Start a new browser session"
+          >
+            <LogOut className="w-3 h-3" />
+            New Session
+          </button>
           <p className="text-sidebar-foreground/30 text-xs">Powered by AI</p>
         </div>
       </aside>

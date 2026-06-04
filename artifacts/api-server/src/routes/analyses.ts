@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, analyses } from "@workspace/db";
 import {
   CreateAnalysisBody,
@@ -10,6 +10,30 @@ import { logger } from "../lib/logger";
 import { openai } from "@workspace/integrations-openai-ai-server";
 
 const router: IRouter = Router();
+
+const MAX_CONCURRENT_ANALYSES = 3;
+const processingQueue: Array<{ id: number; fn: () => Promise<void> }> = [];
+let activeAnalyses = 0;
+
+async function processQueue() {
+  if (activeAnalyses >= MAX_CONCURRENT_ANALYSES || processingQueue.length === 0) return;
+  const item = processingQueue.shift();
+  if (!item) return;
+  activeAnalyses++;
+  await db.update(analyses).set({ status: "processing" }).where(eq(analyses.id, item.id));
+  try {
+    await item.fn();
+  } catch (err) {
+    logger.error({ err, analysisId: item.id }, "Queued analysis failed");
+  } finally {
+    activeAnalyses--;
+    processQueue();
+  }
+}
+
+function getSessionId(req: any): string {
+  return req.sessionId ?? "default";
+}
 
 function parseRow(row: typeof analyses.$inferSelect) {
   return {
@@ -53,7 +77,8 @@ function parseSummaryRow(row: typeof analyses.$inferSelect) {
 }
 
 router.get("/analyses/stats", async (req, res): Promise<void> => {
-  const rows = await db.select().from(analyses).where(eq(analyses.status, "completed"));
+  const sessionId = getSessionId(req);
+  const rows = await db.select().from(analyses).where(and(eq(analyses.status, "completed"), eq(analyses.sessionId, sessionId)));
   const totalAnalyses = rows.length;
   const totalTermsAnalyzed = rows.reduce((sum, r) => sum + r.totalTerms, 0);
   const avgRelevanceRate =
@@ -80,7 +105,8 @@ router.get("/analyses/stats", async (req, res): Promise<void> => {
 });
 
 router.get("/analyses", async (req, res): Promise<void> => {
-  const rows = await db.select().from(analyses).orderBy(desc(analyses.createdAt));
+  const sessionId = getSessionId(req);
+  const rows = await db.select().from(analyses).where(eq(analyses.sessionId, sessionId)).orderBy(desc(analyses.createdAt));
   res.json(rows.map(parseSummaryRow));
 });
 
@@ -94,11 +120,13 @@ router.post("/analyses", async (req, res): Promise<void> => {
   const data = parsed.data;
   const name = data.name ?? `Analysis ${new Date().toLocaleDateString()}`;
 
+  const sessionId = getSessionId(req);
   const [row] = await db
     .insert(analyses)
     .values({
+      sessionId,
       name,
-      status: "processing",
+      status: "queued",
       ruleSetId: data.ruleSetId ?? null,
       activeKeywords: data.activeKeywords,
       searchTerms: data.searchTerms,
@@ -114,49 +142,53 @@ router.post("/analyses", async (req, res): Promise<void> => {
 
   res.status(201).json(parseRow(row));
 
-  (async () => {
-    try {
-      const results = await analyzeSearchQueries({
-        activeKeywords: data.activeKeywords,
-        searchTerms: data.searchTerms,
-        accountName: data.name ?? undefined,
-        targetLocations: data.targetLocations ?? null,
-        landingPageUrl: data.landingPageUrl ?? null,
-        relevantBrandTerms: data.relevantBrandTerms ?? null,
-        competitorBrands: data.competitorBrands ?? [],
-        excludePatterns: data.excludePatterns ?? [],
-        customRules: data.customRules ?? [],
-        minConversionsForNewKeyword: data.minConversionsForNewKeyword ?? 1,
-      });
+  processingQueue.push({
+    id: row.id,
+    fn: async () => {
+      try {
+        const results = await analyzeSearchQueries({
+          activeKeywords: data.activeKeywords,
+          searchTerms: data.searchTerms,
+          accountName: data.name ?? undefined,
+          targetLocations: data.targetLocations ?? null,
+          landingPageUrl: data.landingPageUrl ?? null,
+          relevantBrandTerms: data.relevantBrandTerms ?? null,
+          competitorBrands: data.competitorBrands ?? [],
+          excludePatterns: data.excludePatterns ?? [],
+          customRules: data.customRules ?? [],
+          minConversionsForNewKeyword: data.minConversionsForNewKeyword ?? 1,
+        });
 
-      const relevantCount = results.filter((r) => r.relevance === "Relevant").length;
-      const irrelevantCount = results.filter((r) => r.relevance === "Irrelevant").length;
-      const newKeywordCount = results.filter((r) => r.addAsKeyword).length;
-      const competitorCount = results.filter((r) => r.isCompetitor).length;
+        const relevantCount = results.filter((r) => r.relevance === "Relevant").length;
+        const irrelevantCount = results.filter((r) => r.relevance === "Irrelevant").length;
+        const newKeywordCount = results.filter((r) => r.addAsKeyword).length;
+        const competitorCount = results.filter((r) => r.isCompetitor).length;
 
-      await db
-        .update(analyses)
-        .set({
-          status: "completed",
-          totalTerms: results.length,
-          relevantCount,
-          irrelevantCount,
-          newKeywordCount,
-          competitorCount,
-          results: JSON.stringify(results),
-        })
-        .where(eq(analyses.id, row.id));
-    } catch (err) {
-      logger.error({ err, analysisId: row.id }, "Analysis failed");
-      await db
-        .update(analyses)
-        .set({
-          status: "failed",
-          errorMessage: err instanceof Error ? err.message : "Unknown error",
-        })
-        .where(eq(analyses.id, row.id));
-    }
-  })();
+        await db
+          .update(analyses)
+          .set({
+            status: "completed",
+            totalTerms: results.length,
+            relevantCount,
+            irrelevantCount,
+            newKeywordCount,
+            competitorCount,
+            results: JSON.stringify(results),
+          })
+          .where(eq(analyses.id, row.id));
+      } catch (err) {
+        logger.error({ err, analysisId: row.id }, "Analysis failed");
+        await db
+          .update(analyses)
+          .set({
+            status: "failed",
+            errorMessage: err instanceof Error ? err.message : "Unknown error",
+          })
+          .where(eq(analyses.id, row.id));
+      }
+    },
+  });
+  processQueue();
 });
 
 router.delete("/analyses/:id", async (req, res): Promise<void> => {
@@ -165,12 +197,13 @@ router.delete("/analyses/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [row] = await db.select().from(analyses).where(eq(analyses.id, parsed.data.id));
+  const sessionId = getSessionId(req);
+  const [row] = await db.select().from(analyses).where(and(eq(analyses.id, parsed.data.id), eq(analyses.sessionId, sessionId)));
   if (!row) {
     res.status(404).json({ error: "Analysis not found" });
     return;
   }
-  await db.delete(analyses).where(eq(analyses.id, parsed.data.id));
+  await db.delete(analyses).where(and(eq(analyses.id, parsed.data.id), eq(analyses.sessionId, sessionId)));
   res.status(204).end();
 });
 
@@ -180,7 +213,8 @@ router.get("/analyses/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [row] = await db.select().from(analyses).where(eq(analyses.id, params.data.id));
+  const sessionId = getSessionId(req);
+  const [row] = await db.select().from(analyses).where(and(eq(analyses.id, params.data.id), eq(analyses.sessionId, sessionId)));
   if (!row) {
     res.status(404).json({ error: "Analysis not found" });
     return;
@@ -195,7 +229,8 @@ router.post("/analyses/:id/chat", async (req, res): Promise<void> => {
     return;
   }
 
-  const [row] = await db.select().from(analyses).where(eq(analyses.id, params.data.id));
+  const sessionId = getSessionId(req);
+  const [row] = await db.select().from(analyses).where(and(eq(analyses.id, params.data.id), eq(analyses.sessionId, sessionId)));
   if (!row) {
     res.status(404).json({ error: "Analysis not found" });
     return;
@@ -209,50 +244,104 @@ router.post("/analyses/:id/chat", async (req, res): Promise<void> => {
 
   const existingResults = JSON.parse(row.results) as SearchTermResult[];
 
-  const prompt = `You are a Google Ads search query analysis expert. Here are the current analysis results (${existingResults.length} terms):
+  // For large result sets, use rule-based approach: send a sample + ask for a rule
+  const SAMPLE_SIZE = 50;
+  const sample = existingResults.slice(0, SAMPLE_SIZE);
+  const isLarge = existingResults.length > SAMPLE_SIZE;
 
-${JSON.stringify(existingResults, null, 2)}
+  const rulePrompt = `You are a Google Ads search query analysis expert. Here is a sample of ${sample.length} search terms from an analysis of ${existingResults.length} total terms:
 
-The user wants to modify these results with the following instruction:
+${JSON.stringify(sample, null, 2)}
+
+The user wants to modify ALL ${existingResults.length} results with the following instruction:
 """${message}"""
 ${additionalContext ? `\nAdditional context: ${additionalContext}\n` : ""}
 
-Please return the COMPLETE updated results array (ALL ${existingResults.length} terms, not just the changed ones) as a valid JSON array in the same format. Only modify the fields that the user's request affects. Keep all other fields unchanged.
+Please return a JSON object with two fields:
+1. "explanation": A brief explanation of what changes will be made (1-2 sentences)
+2. "rules": An array of rule objects. Each rule must have:
+   - "field": Which field to modify ("relevance", "addLevel", "isCompetitor", "addAsKeyword")
+   - "value": The new value to set
+   - "match": One of:
+     - { "type": "contains", "terms": ["word1", "word2"] } — applies to terms containing ANY of these words
+     - { "type": "exact", "terms": ["exact term"] } — applies to exact matches
+     - { "type": "all" } — applies to ALL terms
 
-Rules:
-- relevance must be exactly "Relevant" or "Irrelevant"
-- addLevel must be "Campaign", "Ad Group", or "None"
-- addAsKeyword must be true only when the term has conversions > 0
-- isCompetitor must be true only for competitor brand terms
-- relevanceScore: keep the existing score unchanged unless the user's request specifically changes the relevance of a term
-- Keep all campaignName, adGroupName, impressions, clicks, conversions, cost, searchTerm, relevanceScore unchanged unless the user specifically asks to modify them.
+Example rules:
+[
+  {
+    "field": "relevance",
+    "value": "Irrelevant",
+    "match": { "type": "contains", "terms": ["how to", "diy"] }
+  },
+  {
+    "field": "isCompetitor",
+    "value": true,
+    "match": { "type": "contains", "terms": ["nike", "adidas"] }
+  }
+]
 
-Return ONLY the JSON array, no markdown, no explanation.`;
+Return ONLY the JSON object, no markdown, no explanation outside the JSON.`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4.1-mini",
     max_completion_tokens: 8192,
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user", content: rulePrompt }],
   });
 
-  const content = response.choices[0]?.message?.content ?? "[]";
-  const match = content.match(/\[[\s\S]*\]/);
+  const content = response.choices[0]?.message?.content ?? "{}";
+  const match = content.match(/\{[\s\S]*\}/);
   if (!match) {
     res.status(500).json({ error: "Could not parse AI response" });
     return;
   }
 
-  const parsed = JSON.parse(match[0]) as SearchTermResult[];
+  const parsedResponse = JSON.parse(match[0]) as {
+    explanation?: string;
+    rules?: Array<{
+      field: string;
+      value: string | boolean | number;
+      match: { type: "contains" | "exact" | "all"; terms?: string[] };
+    }>;
+  };
 
-  const relevantCount = parsed.filter((r) => r.relevance === "Relevant").length;
-  const irrelevantCount = parsed.filter((r) => r.relevance === "Irrelevant").length;
-  const newKeywordCount = parsed.filter((r) => r.addAsKeyword).length;
-  const competitorCount = parsed.filter((r) => r.isCompetitor).length;
+  // Apply rules to ALL results
+  const updatedResults = existingResults.map((r) => {
+    const updated = { ...r };
+    for (const rule of parsedResponse.rules ?? []) {
+      const termLower = r.searchTerm.toLowerCase();
+      let applies = false;
+      if (rule.match.type === "all") {
+        applies = true;
+      } else if (rule.match.type === "contains") {
+        applies = (rule.match.terms ?? []).some((t) => termLower.includes(t.toLowerCase()));
+      } else if (rule.match.type === "exact") {
+        applies = (rule.match.terms ?? []).some((t) => termLower === t.toLowerCase());
+      }
+      if (applies) {
+        if (rule.field === "relevance" && (rule.value === "Relevant" || rule.value === "Irrelevant")) {
+          updated.relevance = rule.value;
+        } else if (rule.field === "addLevel" && (rule.value === "Campaign" || rule.value === "Ad Group" || rule.value === "None")) {
+          updated.addLevel = rule.value;
+        } else if (rule.field === "isCompetitor" && typeof rule.value === "boolean") {
+          updated.isCompetitor = rule.value;
+        } else if (rule.field === "addAsKeyword" && typeof rule.value === "boolean") {
+          updated.addAsKeyword = rule.value;
+        }
+      }
+    }
+    return updated;
+  });
+
+  const relevantCount = updatedResults.filter((r) => r.relevance === "Relevant").length;
+  const irrelevantCount = updatedResults.filter((r) => r.relevance === "Irrelevant").length;
+  const newKeywordCount = updatedResults.filter((r) => r.addAsKeyword).length;
+  const competitorCount = updatedResults.filter((r) => r.isCompetitor).length;
 
   await db
     .update(analyses)
     .set({
-      results: JSON.stringify(parsed),
+      results: JSON.stringify(updatedResults),
       relevantCount,
       irrelevantCount,
       newKeywordCount,
@@ -261,7 +350,7 @@ Return ONLY the JSON array, no markdown, no explanation.`;
     .where(eq(analyses.id, row.id));
 
   const [updatedRow] = await db.select().from(analyses).where(eq(analyses.id, row.id));
-  res.json(parseRow(updatedRow));
+  res.json({ ...parseRow(updatedRow), explanation: parsedResponse.explanation });
 });
 
 export default router;

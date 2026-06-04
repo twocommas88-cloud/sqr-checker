@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const ruleSets = pgTable("rule_sets", {
   id: serial("id").primaryKey(),
+  sessionId: text("session_id").notNull().default("default"),
   name: text("name").notNull(),
   accountName: text("account_name"),
   competitorBrands: text("competitor_brands").notNull().default("[]"),

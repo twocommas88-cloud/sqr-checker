@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db, ruleSets } from "@workspace/db";
 import {
   CreateRuleSetBody,
@@ -10,6 +10,10 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+function getSessionId(req: any): string {
+  return req.sessionId ?? "default";
+}
 
 function serializeRuleSet(r: typeof ruleSets.$inferSelect) {
   return {
@@ -27,7 +31,8 @@ function serializeRuleSet(r: typeof ruleSets.$inferSelect) {
 }
 
 router.get("/rules", async (req, res): Promise<void> => {
-  const rows = await db.select().from(ruleSets).orderBy(ruleSets.createdAt);
+  const sessionId = getSessionId(req);
+  const rows = await db.select().from(ruleSets).where(eq(ruleSets.sessionId, sessionId)).orderBy(ruleSets.createdAt);
   res.json(rows.map(serializeRuleSet));
 });
 
@@ -37,10 +42,12 @@ router.post("/rules", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const sessionId = getSessionId(req);
   const { competitorBrands, excludePatterns, customRules, ...rest } = parsed.data;
   const [row] = await db
     .insert(ruleSets)
     .values({
+      sessionId,
       ...rest,
       competitorBrands: JSON.stringify(competitorBrands ?? []),
       excludePatterns: JSON.stringify(excludePatterns ?? []),
@@ -61,7 +68,8 @@ router.get("/rules/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [row] = await db.select().from(ruleSets).where(eq(ruleSets.id, params.data.id));
+  const sessionId = getSessionId(req);
+  const [row] = await db.select().from(ruleSets).where(and(eq(ruleSets.id, params.data.id), eq(ruleSets.sessionId, sessionId)));
   if (!row) {
     res.status(404).json({ error: "Rule set not found" });
     return;
@@ -80,6 +88,7 @@ router.put("/rules/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const sessionId = getSessionId(req);
   const { competitorBrands, excludePatterns, customRules, ...rest } = parsed.data;
   const [row] = await db
     .update(ruleSets)
@@ -94,7 +103,7 @@ router.put("/rules/:id", async (req, res): Promise<void> => {
       ...(rest.activeKeywords !== undefined && { activeKeywords: rest.activeKeywords }),
       updatedAt: new Date(),
     })
-    .where(eq(ruleSets.id, params.data.id))
+    .where(and(eq(ruleSets.id, params.data.id), eq(ruleSets.sessionId, sessionId)))
     .returning();
   if (!row) {
     res.status(404).json({ error: "Rule set not found" });
@@ -109,7 +118,8 @@ router.delete("/rules/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [row] = await db.delete(ruleSets).where(eq(ruleSets.id, params.data.id)).returning();
+  const sessionId = getSessionId(req);
+  const [row] = await db.delete(ruleSets).where(and(eq(ruleSets.id, params.data.id), eq(ruleSets.sessionId, sessionId))).returning();
   if (!row) {
     res.status(404).json({ error: "Rule set not found" });
     return;

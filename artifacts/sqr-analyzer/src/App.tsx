@@ -10,9 +10,26 @@ import History from "@/pages/History";
 import Rules from "@/pages/Rules";
 import NotFound from "@/pages/not-found";
 import { Lock } from "lucide-react";
+import { setSessionIdGetter } from "@workspace/api-client-react";
 
 const CORRECT_PASSWORD = "SQR2026";
 const SESSION_KEY = "sqr_authenticated";
+const SESSION_ID_KEY = "sqr_session_id";
+
+function generateSessionId(): string {
+  return "sess_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(2, 6);
+}
+
+function getOrCreateSessionId(): string {
+  let id = localStorage.getItem(SESSION_ID_KEY);
+  if (!id) {
+    id = generateSessionId();
+    localStorage.setItem(SESSION_ID_KEY, id);
+  }
+  return id;
+}
+
+setSessionIdGetter(() => getOrCreateSessionId());
 
 const queryClient = new QueryClient({
   defaultOptions: {
