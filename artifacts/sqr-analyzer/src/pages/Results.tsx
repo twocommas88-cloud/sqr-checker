@@ -174,17 +174,16 @@ function findMatchingNgram(term: string, ngrams: string[]): string | null {
 // ── CSV download ─────────────────────────────────────────────────────────────
 
 function downloadCSV(results: AnalysisResult[], name: string) {
-  const headers = ["Search Term","Campaign Name","Ad Group Name","Impressions","Clicks","Conversions","Cost","Relevance","Reason","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Suggested Negative Term","Out-of-Area Location"];
+  const headers = ["Search Term","Relevance","Reason","Impressions","Clicks","Conversions","Cost","Score","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Suggested Negative Term","Out-of-Area Location","Campaign Name","Ad Group Name"];
   const rows = results.map((r) => [
     `"${r.searchTerm.replace(/"/g, '""')}"`,
-    r.campaignName ? `"${r.campaignName.replace(/"/g, '""')}"` : "",
-    r.adGroupName ? `"${r.adGroupName.replace(/"/g, '""')}"` : "",
+    r.relevance,
+    `"${r.reason.replace(/"/g, '""')}"`,
     r.impressions ?? "",
     r.clicks ?? "",
     r.conversions ?? "",
     r.cost ?? "",
-    r.relevance,
-    `"${r.reason.replace(/"/g, '""')}"`,
+    r.relevanceScore ?? "",
     r.addLevel,
     r.addAsKeyword ? "Yes" : "No",
     r.suggestedAdGroup ? `"${r.suggestedAdGroup.replace(/"/g, '""')}"` : "",
@@ -192,6 +191,8 @@ function downloadCSV(results: AnalysisResult[], name: string) {
     r.matchedKeyword ? `"${r.matchedKeyword.replace(/"/g, '""')}"` : "",
     r.suggestedNegativeTerm ? `"${r.suggestedNegativeTerm.replace(/"/g, '""')}"` : "",
     r.outOfAreaLocation ? `"${r.outOfAreaLocation.replace(/"/g, '""')}"` : "",
+    r.campaignName ? `"${r.campaignName.replace(/"/g, '""')}"` : "",
+    r.adGroupName ? `"${r.adGroupName.replace(/"/g, '""')}"` : "",
   ].join(","));
   const csv = [headers.join(","), ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -204,17 +205,16 @@ function downloadCSV(results: AnalysisResult[], name: string) {
 }
 
 async function copyForSheets(results: AnalysisResult[], name: string): Promise<void> {
-  const headers = ["Search Term","Campaign Name","Ad Group Name","Impressions","Clicks","Conversions","Cost","Relevance","Reason","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Suggested Negative Term","Out-of-Area Location"];
+  const headers = ["Search Term","Relevance","Reason","Impressions","Clicks","Conversions","Cost","Score","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Suggested Negative Term","Out-of-Area Location","Campaign Name","Ad Group Name"];
   const rows = results.map((r) => [
     r.searchTerm,
-    r.campaignName ?? "",
-    r.adGroupName ?? "",
+    r.relevance,
+    r.reason,
     r.impressions ?? "",
     r.clicks ?? "",
     r.conversions ?? "",
     r.cost ?? "",
-    r.relevance,
-    r.reason,
+    r.relevanceScore ?? "",
     r.addLevel,
     r.addAsKeyword ? "Yes" : "No",
     r.suggestedAdGroup ?? "",
@@ -222,6 +222,8 @@ async function copyForSheets(results: AnalysisResult[], name: string): Promise<v
     r.matchedKeyword ?? "",
     r.suggestedNegativeTerm ?? "",
     r.outOfAreaLocation ?? "",
+    r.campaignName ?? "",
+    r.adGroupName ?? "",
   ].join("\t"));
   const tsv = [headers.join("\t"), ...rows].join("\n");
   await navigator.clipboard.writeText(tsv);
@@ -710,13 +712,13 @@ export default function Results() {
                   <thead className="bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     <tr>
                       <th className="text-left px-4 py-3 w-[220px] min-w-[200px] sticky left-0 bg-muted/50 z-10">Search Term</th>
+                      <th className="text-left px-3 py-3 w-[90px]">Relevance</th>
+                      <th className="text-left px-3 py-3 w-[160px]">Reason</th>
                       <th className="text-right px-3 py-3 w-[70px]">Impr.</th>
                       <th className="text-right px-3 py-3 w-[60px]">Clicks</th>
                       <th className="text-right px-3 py-3 w-[60px]">Conv.</th>
                       <th className="text-right px-3 py-3 w-[60px]">Cost</th>
                       <th className="text-left px-3 py-3 w-[80px]">Score</th>
-                      <th className="text-left px-3 py-3 w-[90px]">Relevance</th>
-                      <th className="text-left px-3 py-3 w-[160px]">Reason</th>
                       <th className="text-left px-3 py-3 w-[90px]">Add Level</th>
                       <th className="text-left px-3 py-3 w-[70px]">New KW?</th>
                       <th className="text-left px-3 py-3 w-[110px]">Add as Neg</th>
@@ -741,6 +743,16 @@ export default function Results() {
                               <span className="text-xs text-muted-foreground truncate block" title={r.matchedKeyword}>→ {r.matchedKeyword}</span>
                             )}
                           </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                              r.relevance === "Relevant" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                            }`} data-testid={`relevance-${i}`}>
+                              {r.relevance}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 text-muted-foreground text-xs w-[160px]">
+                            <span className="truncate block" title={r.reason}>{r.reason}</span>
+                          </td>
                           <td className="px-3 py-2.5 text-right text-muted-foreground">{r.impressions?.toLocaleString() ?? "—"}</td>
                           <td className="px-3 py-2.5 text-right text-muted-foreground">{r.clicks?.toLocaleString() ?? "—"}</td>
                           <td className="px-3 py-2.5 text-right text-muted-foreground">{r.conversions ?? "—"}</td>
@@ -755,16 +767,6 @@ export default function Results() {
                                 {r.relevanceScore}
                               </span>
                             ) : <span className="text-muted-foreground text-xs">—</span>}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                              r.relevance === "Relevant" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-                            }`} data-testid={`relevance-${i}`}>
-                              {r.relevance}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 text-muted-foreground text-xs w-[160px]">
-                            <span className="truncate block" title={r.reason}>{r.reason}</span>
                           </td>
                           <td className="px-3 py-2.5">
                             {r.addLevel !== "None" ? (
