@@ -5,8 +5,9 @@ import {
   CreateAnalysisBody,
   GetAnalysisParams,
 } from "@workspace/api-zod";
-import { analyzeSearchQueries } from "../lib/sqrAnalyzer";
+import { analyzeSearchQueries, type SearchTermResult } from "../lib/sqrAnalyzer";
 import { logger } from "../lib/logger";
+import { openai } from "@workspace/integrations-openai-ai-server";
 
 const router: IRouter = Router();
 
@@ -185,6 +186,81 @@ router.get("/analyses/:id", async (req, res): Promise<void> => {
     return;
   }
   res.json(parseRow(row));
+});
+
+router.post("/analyses/:id/chat", async (req, res): Promise<void> => {
+  const params = GetAnalysisParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [row] = await db.select().from(analyses).where(eq(analyses.id, params.data.id));
+  if (!row) {
+    res.status(404).json({ error: "Analysis not found" });
+    return;
+  }
+
+  const { message, additionalContext } = req.body as { message: string; additionalContext?: string };
+  if (!message || typeof message !== "string") {
+    res.status(400).json({ error: "message is required" });
+    return;
+  }
+
+  const existingResults = JSON.parse(row.results) as SearchTermResult[];
+
+  const prompt = `You are a Google Ads search query analysis expert. Here are the current analysis results:
+
+${JSON.stringify(existingResults.slice(0, 50), null, 2)}
+
+The user wants to modify these results with the following instruction:
+"""${message}"""
+${additionalContext ? `\nAdditional context: ${additionalContext}\n` : ""}
+
+Please return the COMPLETE updated results array (all terms, not just the changed ones) as a valid JSON array in the same format. Only modify the fields that the user's request affects. Keep all other fields unchanged.
+
+Rules:
+- relevance must be exactly "Relevant" or "Irrelevant"
+- addLevel must be "Campaign", "Ad Group", or "None"
+- addAsKeyword must be true only when the term has conversions > 0
+- isCompetitor must be true only for competitor brand terms
+- Keep all campaignName, adGroupName, impressions, clicks, conversions, cost, searchTerm unchanged unless the user specifically asks to modify them.
+
+Return ONLY the JSON array, no markdown, no explanation.`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4.1-mini",
+    max_completion_tokens: 8192,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const content = response.choices[0]?.message?.content ?? "[]";
+  const match = content.match(/\[[\s\S]*\]/);
+  if (!match) {
+    res.status(500).json({ error: "Could not parse AI response" });
+    return;
+  }
+
+  const parsed = JSON.parse(match[0]) as SearchTermResult[];
+
+  const relevantCount = parsed.filter((r) => r.relevance === "Relevant").length;
+  const irrelevantCount = parsed.filter((r) => r.relevance === "Irrelevant").length;
+  const newKeywordCount = parsed.filter((r) => r.addAsKeyword).length;
+  const competitorCount = parsed.filter((r) => r.isCompetitor).length;
+
+  await db
+    .update(analyses)
+    .set({
+      results: JSON.stringify(parsed),
+      relevantCount,
+      irrelevantCount,
+      newKeywordCount,
+      competitorCount,
+    })
+    .where(eq(analyses.id, row.id));
+
+  const [updatedRow] = await db.select().from(analyses).where(eq(analyses.id, row.id));
+  res.json(parseRow(updatedRow));
 });
 
 export default router;

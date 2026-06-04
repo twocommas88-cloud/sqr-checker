@@ -4,9 +4,10 @@ import {
   useGetAnalysis, getGetAnalysisQueryKey,
   useDeleteAnalysis, getListAnalysesQueryKey,
   useCreateRuleSet,
+  useChatWithAnalysis,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Download, ArrowLeft, Loader2, AlertTriangle, Filter, X, Trash2, RefreshCw, Sheet, BookmarkPlus, RotateCcw } from "lucide-react";
+import { Download, ArrowLeft, Loader2, AlertTriangle, Filter, X, Trash2, RefreshCw, Sheet, BookmarkPlus, RotateCcw, MessageSquare, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type Relevance = "Relevant" | "Irrelevant" | "";
@@ -297,8 +298,11 @@ export default function Results() {
 
   const deleteAnalysis = useDeleteAnalysis();
   const createRuleSet = useCreateRuleSet();
+  const chatWithAnalysis = useChatWithAnalysis();
 
   const [showSaveProfile, setShowSaveProfile] = useState(false);
+  const [chatMessage, setChatMessage] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     if (!analysis || analysis.status === "completed" || analysis.status === "failed") return;
@@ -765,6 +769,78 @@ export default function Results() {
           </div>
         </div>
       )}
+
+      {/* AI Chat Panel */}
+      {analysis.status === "completed" && (
+        <div className="border-t border-border bg-card flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setChatOpen(!chatOpen)}
+            className="w-full flex items-center justify-between px-8 py-3 text-sm font-medium text-foreground hover:bg-muted/30 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-primary" />
+              Chat with AI — Modify Results
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {chatOpen ? "Hide" : "Open to add rules or refine the analysis"}
+            </span>
+          </button>
+
+          {chatOpen && (
+            <div className="px-8 pb-6 space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Ask the AI to modify the analysis results. For example: "Add rule: flag all terms with 'how to' as irrelevant" or "Make all terms containing 'free' as competitors."
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey && chatMessage.trim()) {
+                      e.preventDefault();
+                      handleChatSend();
+                    }
+                  }}
+                  placeholder="e.g., Add rule: flag all terms with 'how to' as irrelevant"
+                  className="flex-1 rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                  disabled={chatWithAnalysis.isPending}
+                />
+                <button
+                  onClick={handleChatSend}
+                  disabled={chatWithAnalysis.isPending || !chatMessage.trim()}
+                  className="flex items-center gap-2 bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {chatWithAnalysis.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  Send
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
+
+  function handleChatSend() {
+    if (!chatMessage.trim() || !analysis) return;
+    chatWithAnalysis.mutate(
+      { id, data: { message: chatMessage.trim() } },
+      {
+        onSuccess: () => {
+          toast({ title: "Analysis updated", description: "The AI has modified your results." });
+          setChatMessage("");
+          queryClient.invalidateQueries({ queryKey: getGetAnalysisQueryKey(id) });
+        },
+        onError: () => {
+          toast({ title: "Chat failed", description: "Could not modify the analysis. Try again.", variant: "destructive" });
+        },
+      }
+    );
+  }
 }

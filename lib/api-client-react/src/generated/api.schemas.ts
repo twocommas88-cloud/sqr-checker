@@ -203,3 +203,16 @@ export interface AnalysisStats {
   topCompetitors: string[];
 }
 
+export interface ChatRequest {
+  /** Natural language request to modify the analysis results (e.g., Add rule - flag all terms with 'how to' as irrelevant) */
+  message: string;
+  /** Optional additional context to help the AI understand the request */
+  additionalContext?: string;
+}
+
+export interface ChatResponse {
+  results: SearchTermResult[];
+  /** Explanation of the changes made by the AI */
+  explanation?: string;
+}
+

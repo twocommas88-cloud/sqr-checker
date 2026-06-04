@@ -245,7 +245,8 @@ async function analyzeTermsBatch(
     : "";
 
   const relevantBrandSection = options.relevantBrandTerms?.trim()
-    ? `\nRELEVANT BRAND TERMS: The following brand names should ALWAYS be considered Relevant (even if they also look like competitors — they are your own brands or partner brands): ${options.relevantBrandTerms.trim()}\n`
+    ? `\nRELEVANT BRAND TERMS: The following brand names should ALWAYS be considered Relevant (even if they also look like competitors — they are your own brands or partner brands): ${options.relevantBrandTerms.trim()}
+- IMPORTANT: Recognize and match VARIATIONS of these brand names — different spellings, misspellings, abbreviations, hyphens, spaces, and combined forms. For example, if brand is "JunkBros", also recognize "junkbros", "junk-bros", "junk bros", "junk bros llc", "junkbrosco", "junk brosco", etc. Any term that contains ANY recognizable variation of these brand names should be marked as Relevant and NOT as a competitor.\n`
     : "";
 
   const locationSection = options.targetLocations?.trim()
@@ -285,7 +286,7 @@ Rules:
 1. RELEVANCE: Apply the philosophy above. Use active keywords + landing page content as the primary signal.
 2. COMPETITOR: isCompetitor=true ONLY if the term contains a DIFFERENT competitor brand name — these need to be added as negatives. NEVER flag own-brand terms as competitors (see OWN BRAND above).
 3. ADD LEVEL: "Campaign" = broadly irrelevant to all ad groups; "Ad Group" = irrelevant only to one specific ad group; "None" = relevant (no negative needed).
-4. ADD AS KEYWORD: addAsKeyword=true ONLY if: relevant AND >= ${minConversions} conversions AND not already covered by an existing exact-match keyword.
+4. ADD AS KEYWORD: addAsKeyword=true ONLY if: relevant AND has conversions (conversions > 0) AND >= ${minConversions} conversions AND not already covered by an existing exact-match keyword. If a term has 0 conversions, ALWAYS set addAsKeyword=false regardless of relevance.
 5. SUGGESTED AD GROUP: If addAsKeyword=true, suggest the best ad group from the active keywords list.
 6. MATCHED KEYWORD: The active keyword this search term matched or is closest to.
 7. REASON: Be concise and specific (max 15 words).
@@ -299,6 +300,9 @@ Return ONLY a valid JSON array with exactly ${terms.length} objects, one per sea
 CRITICAL RULES FOR JSON OUTPUT:
 - The "relevance" field MUST be exactly "Relevant" or "Irrelevant" — no other text, no sentence, no explanation. Just the single word.
 - The "reason" field MUST be a separate concise sentence (max 15 words). Never put the reason text inside the "relevance" field.
+- The "addAsKeyword" field MUST be false when the search term has 0 conversions. Only recommend as a new keyword when conversions > 0.
+- The "addLevel" field MUST be "None" when addAsKeyword is false.
+- Never suggest core service terms (e.g. "junk", "removal", "hauling", "disposal", "pickup", "pick up", "mattress", "furniture", "appliance", "estate", "cleanout") as negative terms — these are the core business terms and must remain Relevant.
 - Keep the exact JSON field order shown above.
 
 outOfAreaLocation: If the term is flagged as outside the target service area, set this to the specific location word or phrase found in the search term that is NOT in the target locations list (e.g. "lewisburg", "nashville"). Otherwise null.`;

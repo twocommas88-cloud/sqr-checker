@@ -12,6 +12,8 @@ export * from './analysisStats';
 export * from './analysisStatus';
 export * from './analysisSummary';
 export * from './analysisSummaryStatus';
+export * from './chatRequest';
+export * from './chatResponse';
 export * from './healthStatus';
 export * from './ruleSet';
 export * from './ruleSetInput';

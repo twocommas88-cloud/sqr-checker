@@ -186,6 +186,33 @@ paths:
         "404":
           description: Not found
 
+  /analyses/{id}/chat:
+    post:
+      operationId: chatWithAnalysis
+      tags: [analyses]
+      summary: Chat with AI to modify analysis results
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+      responses:
+        "200":
+          description: Modified analysis results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+        "404":
+          description: Not found
+
   /analyses/stats:
     get:
       operationId: getAnalysisStats
@@ -458,3 +485,26 @@ components:
           type: array
           items:
             type: string
+
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: Natural language request to modify the analysis results (e.g., Add rule - flag all terms with 'how to' as irrelevant)
+        additionalContext:
+          type: string
+          description: Optional additional context to help the AI understand the request
+
+    ChatResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchTermResult"
+        explanation:
+          type: string
+          description: Explanation of the changes made by the AI

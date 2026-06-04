@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { useCreateAnalysis, useListRules } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import TagInput from "@/components/TagInput";
-import { Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Upload } from "lucide-react";
+import * as XLSX from "xlsx";
 
 interface FormData {
   name: string;
@@ -19,7 +20,7 @@ interface FormData {
 }
 
 export default function Analyze() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { data: ruleSets } = useListRules();
   const createAnalysis = useCreateAnalysis();
@@ -28,6 +29,9 @@ export default function Analyze() {
   const [excludePatterns, setExcludePatterns] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [relevantBrandTerms, setRelevantBrandTerms] = useState<string[]>([]);
+
+  const activeKeywordsFileRef = useRef<HTMLInputElement>(null);
+  const searchTermsFileRef = useRef<HTMLInputElement>(null);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     defaultValues: {
@@ -44,6 +48,39 @@ export default function Analyze() {
   });
 
   const selectedRuleSetId = watch("ruleSetId");
+
+  // Read URL query params on mount (for Redo button)
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    if (query.get("name")) setValue("name", query.get("name") ?? "");
+    if (query.get("landingPageUrl")) setValue("landingPageUrl", query.get("landingPageUrl") ?? "");
+    if (query.get("targetLocations")) setValue("targetLocations", query.get("targetLocations") ?? "");
+    if (query.get("relevantBrandTerms")) {
+      const raw = query.get("relevantBrandTerms") ?? "";
+      const terms = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      setRelevantBrandTerms(terms);
+      setValue("relevantBrandTerms", raw);
+    }
+    if (query.get("activeKeywords")) setValue("activeKeywords", query.get("activeKeywords") ?? "");
+    if (query.get("searchTerms")) setValue("searchTerms", query.get("searchTerms") ?? "");
+    if (query.get("minConversionsForNewKeyword")) {
+      setValue("minConversionsForNewKeyword", Number(query.get("minConversionsForNewKeyword")) || 1);
+    }
+    try {
+      const cb = query.get("competitorBrands");
+      if (cb) setCompetitorBrands(JSON.parse(cb));
+    } catch { /* ignore */ }
+    try {
+      const ep = query.get("excludePatterns");
+      if (ep) setExcludePatterns(JSON.parse(ep));
+    } catch { /* ignore */ }
+    try {
+      const cr = query.get("customRules");
+      if (cr) setValue("customRules", (JSON.parse(cr) as string[]).join("\n"));
+    } catch { /* ignore */ }
+    // If any query params exist, open Advanced Rules
+    if (query.toString()) setShowAdvanced(true);
+  }, [setValue]);
 
   function handleRuleSetChange(id: string) {
     setValue("ruleSetId", id);
@@ -63,6 +100,39 @@ export default function Analyze() {
           setValue("relevantBrandTerms", rs.relevantBrandTerms);
         }
       }
+    }
+  }
+
+  function handleFileUpload(
+    file: File,
+    setText: (val: string) => void
+  ) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const data = e.target?.result;
+      if (!data) return;
+      try {
+        let text: string;
+        if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+          const workbook = XLSX.read(data, { type: "array" });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as unknown[][];
+          text = json
+            .map((row) => (row as string[]).join("\t"))
+            .join("\n");
+        } else {
+          text = String(data);
+        }
+        setText(text);
+        toast({ title: "File loaded", description: `${file.name} — ${text.split("\n").filter(Boolean).length} rows loaded` });
+      } catch (err) {
+        toast({ title: "File error", description: "Could not read the file", variant: "destructive" });
+      }
+    };
+    if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.readAsText(file);
     }
   }
 
@@ -138,7 +208,7 @@ export default function Analyze() {
           </div>
         </div>
 
-        {/* Landing Page URL + Target Locations */}
+        {/* Landing Page URL + Target Locations + Relevant Brand Terms */}
         <div className="bg-accent/40 border border-accent rounded-xl px-5 py-4 space-y-4">
           <div>
             <label className="text-sm font-medium text-foreground block mb-1">
@@ -170,6 +240,25 @@ export default function Analyze() {
               data-testid="input-target-locations"
             />
           </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1">
+              Relevant Brand Terms <span className="text-red-500">*</span>
+            </label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Enter your brand name(s). The AI will recognize variations, misspellings, abbreviations, and combined forms. This prevents your brand from being flagged as a competitor or irrelevant.
+            </p>
+            <TagInput
+              value={relevantBrandTerms}
+              onChange={(terms) => {
+                setRelevantBrandTerms(terms);
+                setValue("relevantBrandTerms", terms.join(", "), { shouldValidate: true });
+              }}
+              placeholder="your brand name..."
+              data-testid="tag-input-relevant-brands"
+            />
+            {errors.relevantBrandTerms && <p className="text-xs text-destructive mt-1">Brand terms are required</p>}
+          </div>
         </div>
 
         {/* Keywords and Terms */}
@@ -186,6 +275,27 @@ export default function Analyze() {
               className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-ring resize-y"
               data-testid="textarea-active-keywords"
             />
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="file"
+                ref={activeKeywordsFileRef}
+                accept=".csv,.xlsx,.xls,.txt"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileUpload(file, (val) => setValue("activeKeywords", val));
+                  if (e.target) e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => activeKeywordsFileRef.current?.click()}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground border border-border rounded-md px-2 py-1 hover:bg-muted/40 transition-colors"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Upload CSV / XLSX
+              </button>
+            </div>
             {errors.activeKeywords && <p className="text-xs text-destructive mt-1">Active keywords are required</p>}
           </div>
           <div>
@@ -200,6 +310,27 @@ export default function Analyze() {
               className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-ring resize-y"
               data-testid="textarea-search-terms"
             />
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="file"
+                ref={searchTermsFileRef}
+                accept=".csv,.xlsx,.xls,.txt"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileUpload(file, (val) => setValue("searchTerms", val));
+                  if (e.target) e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => searchTermsFileRef.current?.click()}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground border border-border rounded-md px-2 py-1 hover:bg-muted/40 transition-colors"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Upload CSV / XLSX
+              </button>
+            </div>
             {errors.searchTerms && <p className="text-xs text-destructive mt-1">Search terms are required</p>}
           </div>
         </div>
@@ -218,20 +349,7 @@ export default function Analyze() {
 
           {showAdvanced && (
             <div className="px-5 pb-5 border-t border-border space-y-4 pt-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground block mb-1.5">Relevant Brand Terms</label>
-                  <p className="text-xs text-muted-foreground mb-2">Press Enter or comma to add. The AI will mark these as relevant.</p>
-                  <TagInput
-                    value={relevantBrandTerms}
-                    onChange={(terms) => {
-                      setRelevantBrandTerms(terms);
-                      setValue("relevantBrandTerms", terms.join(", "));
-                    }}
-                    placeholder="your brand name..."
-                    data-testid="tag-input-relevant-brands"
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground block mb-1.5">Competitor Brands</label>
                   <p className="text-xs text-muted-foreground mb-2">Press Enter or comma to add. These terms will be flagged as negatives.</p>

@@ -215,6 +215,57 @@ export const GetAnalysisResponse = zod.object({
 
 
 /**
+ * @summary Chat with AI to modify analysis results
+ */
+export const ChatWithAnalysisParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ChatWithAnalysisBody = zod.object({
+  "message": zod.string().describe('Natural language request to modify the analysis results (e.g., Add rule - flag all terms with \'how to\' as irrelevant)'),
+  "additionalContext": zod.string().optional().describe('Optional additional context to help the AI understand the request')
+})
+
+export const ChatWithAnalysisResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "status": zod.enum(['pending', 'processing', 'completed', 'failed']),
+  "ruleSetId": zod.number().nullish(),
+  "activeKeywords": zod.string().optional().describe('The raw active keywords string used for this analysis'),
+  "searchTerms": zod.string().optional().describe('The raw search terms string used for this analysis'),
+  "targetLocations": zod.string().nullish().describe('Target service locations used for this analysis'),
+  "landingPageUrl": zod.string().nullish().describe('Landing page URL used for this analysis'),
+  "relevantBrandTerms": zod.string().nullish().describe('Brand terms that should always be considered relevant for this analysis'),
+  "competitorBrands": zod.array(zod.string()).optional(),
+  "excludePatterns": zod.array(zod.string()).optional(),
+  "customRules": zod.array(zod.string()).optional(),
+  "minConversionsForNewKeyword": zod.number().optional(),
+  "totalTerms": zod.number().optional(),
+  "relevantCount": zod.number().optional(),
+  "irrelevantCount": zod.number().optional(),
+  "newKeywordCount": zod.number().optional(),
+  "competitorCount": zod.number().optional(),
+  "results": zod.array(zod.object({
+  "searchTerm": zod.string(),
+  "impressions": zod.number().nullish(),
+  "clicks": zod.number().nullish(),
+  "conversions": zod.number().nullish(),
+  "cost": zod.number().nullish(),
+  "relevance": zod.enum(['Relevant', 'Irrelevant']),
+  "reason": zod.string(),
+  "addLevel": zod.enum(['Campaign', 'Ad Group', 'None']),
+  "addAsKeyword": zod.boolean(),
+  "suggestedAdGroup": zod.string().nullable(),
+  "isCompetitor": zod.boolean(),
+  "matchedKeyword": zod.string().nullish(),
+  "outOfAreaLocation": zod.string().nullish().describe('The specific location word\/phrase in the search term that is outside the target service area')
+})),
+  "errorMessage": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary Get aggregate stats across all analyses
  */
 export const GetAnalysisStatsResponse = zod.object({

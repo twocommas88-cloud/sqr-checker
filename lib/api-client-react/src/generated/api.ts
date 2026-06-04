@@ -24,6 +24,7 @@ import type {
   AnalysisInput,
   AnalysisStats,
   AnalysisSummary,
+  ChatRequest,
   HealthStatus,
   RuleSet,
   RuleSetInput
@@ -780,6 +781,78 @@ export function useGetAnalysis<TData = Awaited<ReturnType<typeof getAnalysis>>, 
 
 
 
+
+export const getChatWithAnalysisUrl = (id: number,) => {
+
+
+
+
+  return `/api/analyses/${id}/chat`
+}
+
+/**
+ * @summary Chat with AI to modify analysis results
+ */
+export const chatWithAnalysis = async (id: number,
+    chatRequest: ChatRequest, options?: RequestInit): Promise<Analysis> => {
+
+  return customFetch<Analysis>(getChatWithAnalysisUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      chatRequest,)
+  }
+);}
+
+
+
+
+export const getChatWithAnalysisMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof chatWithAnalysis>>, TError,{id: number;data: BodyType<ChatRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof chatWithAnalysis>>, TError,{id: number;data: BodyType<ChatRequest>}, TContext> => {
+
+const mutationKey = ['chatWithAnalysis'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof chatWithAnalysis>>, {id: number;data: BodyType<ChatRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  chatWithAnalysis(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ChatWithAnalysisMutationResult = NonNullable<Awaited<ReturnType<typeof chatWithAnalysis>>>
+    export type ChatWithAnalysisMutationBody = BodyType<ChatRequest>
+    export type ChatWithAnalysisMutationError = ErrorType<void>
+
+    /**
+ * @summary Chat with AI to modify analysis results
+ */
+export const useChatWithAnalysis = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof chatWithAnalysis>>, TError,{id: number;data: BodyType<ChatRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof chatWithAnalysis>>,
+        TError,
+        {id: number;data: BodyType<ChatRequest>},
+        TContext
+      > => {
+      return useMutation(getChatWithAnalysisMutationOptions(options));
+    }
 
 export const getGetAnalysisStatsUrl = () => {
 
