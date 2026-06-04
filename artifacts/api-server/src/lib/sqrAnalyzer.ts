@@ -92,9 +92,17 @@ function isOwnBrandTerm(term: string, brandTokens: string[]): boolean {
 
 // Header keyword sets for detecting header/metadata rows
 const HEADER_KEYWORDS = new Set([
-  "search term", "keyword", "match type", "campaign", "ad group", "clicks",
-  "impressions", "impr.", "ctr", "cost", "conversions", "currency", "status",
-  "added/excluded", "keyword status", "avg. cpc", "conv. rate",
+  // Search term column aliases
+  "search term", "search query", "query", "keyword",
+  // Metric column aliases
+  "clicks", "click",
+  "impressions", "impr.", "impr", "impression",
+  "cost", "spend", "amount spent", "cost (usd)", "spend (usd)", "cost/conv.",
+  "conversions", "conv.", "conv", "all conv.", "all conversions", "all conv",
+  "ctr", "avg. cpc", "conv. rate", "cost / conv.",
+  // Structural columns
+  "match type", "campaign", "campaign name", "ad group", "ad group name",
+  "currency", "status", "added/excluded", "keyword status",
 ]);
 
 function looksLikeHeader(parts: string[]): boolean {
@@ -211,11 +219,21 @@ function parseSearchTerms(raw: string): SearchTermData[] {
     if (!headerFound && looksLikeHeader(parts)) {
       // Map column names to indices
       const cols = parts.map((p) => p.toLowerCase().trim());
-      colSearchTerm = Math.max(0, cols.findIndex((c) => c === "search term" || c === "keyword"));
-      colClicks = cols.findIndex((c) => c === "clicks");
-      colImpressions = cols.findIndex((c) => c === "impr." || c === "impressions");
-      colCost = cols.findIndex((c) => c === "cost");
-      colConversions = cols.findIndex((c) => c === "conversions");
+      colSearchTerm = Math.max(0, cols.findIndex((c) =>
+        c === "search term" || c === "search query" || c === "query" || c === "keyword"
+      ));
+      colClicks = cols.findIndex((c) =>
+        c === "clicks" || c === "click"
+      );
+      colImpressions = cols.findIndex((c) =>
+        c === "impressions" || c === "impr." || c === "impr" || c === "impression"
+      );
+      colCost = cols.findIndex((c) =>
+        c === "cost" || c === "spend" || c === "amount spent" || c === "cost (usd)" || c === "spend (usd)"
+      );
+      colConversions = cols.findIndex((c) =>
+        c === "conversions" || c === "conv." || c === "conv" || c === "all conv." || c === "all conversions" || c === "all conv"
+      );
       colCampaign = cols.findIndex((c) => c === "campaign" || c === "campaign name");
       colAdGroup = cols.findIndex((c) => c === "ad group" || c === "ad group name");
       headerFound = true;
