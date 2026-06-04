@@ -417,13 +417,17 @@ CRITICAL RULES FOR JSON OUTPUT:
 - The "addLevel" field MUST be "None" when addAsKeyword is false.
 - Never suggest core service terms as negative terms — these are the words that define the business's primary offerings (e.g., terms from the active keywords list, words that represent the main products/services). Core business terms must remain Relevant.
 - For any business type (not just junk removal): identify what the ACTIVE KEYWORDS reveal as the core business terms and NEVER mark those as irrelevant or suggest them as negatives.
-- suggestedNegativeTerm: When the search term contains a brand name (own or relevant) PLUS an irrelevant modifier, set this to the specific IRRELEVANT word/phrase to add as a negative keyword. Examples:
-  - "Junk Bros how to" → "how to" (brand name is relevant, but "how to" is a non-commercial modifier)
-  - "Junk Bros careers" → "careers" (brand name is relevant, but "careers" is a non-commercial modifier)
-  - "Junk Bros near me" → null (both are relevant — no negative needed)
-  - "how to dispose junk" → null (no brand name present, just a generic irrelevant term)
-  - ONLY set this when the term contains BOTH a brand name AND an irrelevant modifier. Otherwise null.
-  - The suggested negative term should be a SHORT PHRASE (1-2 words) that is the actual word to add as a negative keyword, NOT the full search term.
+- suggestedNegativeTerm: For any IRRELEVANT term, extract the specific word or short phrase that makes it irrelevant — this is what the advertiser should add as a Google Ads negative keyword to prevent wasted spend. Set to null for Relevant terms. Examples by category:
+  - Web/directory noise: "junk removal .com" → ".com" | "www junk removal" → "www" | "junk removal website" → "website"
+  - Social/video platforms: "junk bros facebook" → "facebook" | "junk removal youtube" → "youtube" | "junk removal instagram" → "instagram" | "junk removal reddit" → "reddit" | "junk removal yelp" → "yelp"
+  - Informational/DIY intent: "how to remove junk yourself" → "how to" | "diy junk removal" → "diy" | "junk removal tutorial" → "tutorial" | "junk removal tips" → "tips" | "junk removal guide" → "guide"
+  - Employment: "junk removal jobs near me" → "jobs" | "junk removal careers" → "careers" | "junk removal salary" → "salary" | "junk removal hiring" → "hiring"
+  - Brand + irrelevant modifier: "Junk Bros how to" → "how to" | "Junk Bros reviews" → "reviews" | "Junk Bros complaints" → "complaints"
+  - Out-of-area: set to null — the location is already captured in outOfAreaLocation
+  - Competitor brand terms: set to null — the competitor brand is already captured in isCompetitor
+  - Completely unrelated terms with no extractable modifier (e.g. "buy a car"): set to null
+  - NEVER suggest core service/business terms as negatives (words from active keywords list)
+  - The suggested negative MUST be SHORT (1-3 words max) — the actual word/phrase to type into Google Ads negative keywords, NOT the full search term
 - Keep the exact JSON field order shown above.
 
 outOfAreaLocation: If the term is flagged as outside the target service area, set this to the specific location word or phrase found in the search term that is NOT in the target locations list (e.g. "lewisburg", "nashville"). Otherwise null.`;

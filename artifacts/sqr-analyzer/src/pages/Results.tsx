@@ -5,6 +5,7 @@ import {
   useDeleteAnalysis, getListAnalysesQueryKey,
   useCreateRuleSet,
   useChatWithAnalysis,
+  useRerunAnalysis,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download, ArrowLeft, Loader2, AlertTriangle, Filter, X, Trash2, RefreshCw, Sheet, BookmarkPlus, RotateCcw, MessageSquare, Send } from "lucide-react";
@@ -327,6 +328,7 @@ export default function Results() {
   const deleteAnalysis = useDeleteAnalysis();
   const createRuleSet = useCreateRuleSet();
   const chatWithAnalysis = useChatWithAnalysis();
+  const rerunAnalysis = useRerunAnalysis();
 
   const [showSaveProfile, setShowSaveProfile] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
@@ -378,6 +380,17 @@ export default function Results() {
     if (analysis.customRules?.length) query.set("customRules", JSON.stringify(analysis.customRules));
     if (analysis.minConversionsForNewKeyword != null) query.set("minConversionsForNewKeyword", String(analysis.minConversionsForNewKeyword));
     setLocation(`/analyze?${query.toString()}`);
+  }
+
+  function handleRerun() {
+    if (!analysis) return;
+    rerunAnalysis.mutate({ id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetAnalysisQueryKey(id) });
+        toast({ title: "Re-running analysis", description: "The AI is re-analyzing your search terms with the latest logic." });
+      },
+      onError: () => toast({ title: "Error", description: "Failed to re-run analysis", variant: "destructive" }),
+    });
   }
 
   async function handleCopyForSheets() {
@@ -526,13 +539,23 @@ export default function Results() {
             Delete
           </button>
           <button
+            onClick={handleRerun}
+            disabled={rerunAnalysis.isPending || analysis.status === "processing" || analysis.status === "pending"}
+            className="flex items-center gap-1.5 border border-amber-400 text-amber-700 bg-amber-50 text-sm font-medium px-3 py-2 rounded-md hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Re-run with the latest AI logic (updates translation & suggested negatives)"
+            data-testid="button-rerun"
+          >
+            {rerunAnalysis.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+            Re-Run Analysis
+          </button>
+          <button
             onClick={handleRedo}
-            className="flex items-center gap-1.5 border border-primary/40 text-primary text-sm font-medium px-3 py-2 rounded-md hover:bg-primary/10 transition-colors"
-            title="Redo with same inputs"
+            className="flex items-center gap-1.5 border border-border text-muted-foreground text-sm font-medium px-3 py-2 rounded-md hover:bg-muted/40 hover:text-foreground transition-colors"
+            title="Start a new analysis with the same inputs"
             data-testid="button-redo"
           >
             <RotateCcw className="w-4 h-4" />
-            Redo
+            New Copy
           </button>
           <button
             onClick={handleCopyForSheets}

@@ -223,6 +223,88 @@ router.get("/analyses/:id", async (req, res): Promise<void> => {
   res.json(parseRow(row));
 });
 
+router.post("/analyses/:id/rerun", async (req, res): Promise<void> => {
+  const params = GetAnalysisParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const sessionId = getSessionId(req);
+  const [row] = await db.select().from(analyses).where(and(eq(analyses.id, params.data.id), eq(analyses.sessionId, sessionId)));
+  if (!row) {
+    res.status(404).json({ error: "Analysis not found" });
+    return;
+  }
+
+  const [updatedRow] = await db.update(analyses).set({
+    status: "queued",
+    results: "[]",
+    totalTerms: 0,
+    relevantCount: 0,
+    irrelevantCount: 0,
+    newKeywordCount: 0,
+    competitorCount: 0,
+    errorMessage: null,
+  }).where(eq(analyses.id, params.data.id)).returning();
+
+  res.json(parseRow(updatedRow));
+
+  const data = {
+    activeKeywords: row.activeKeywords,
+    searchTerms: row.searchTerms,
+    name: row.name,
+    targetLocations: row.targetLocations,
+    landingPageUrl: row.landingPageUrl,
+    relevantBrandTerms: row.relevantBrandTerms,
+    competitorBrands: JSON.parse(row.competitorBrands) as string[],
+    excludePatterns: JSON.parse(row.excludePatterns) as string[],
+    customRules: JSON.parse(row.customRules) as string[],
+    minConversionsForNewKeyword: row.minConversionsForNewKeyword,
+  };
+
+  processingQueue.push({
+    id: row.id,
+    fn: async () => {
+      try {
+        const results = await analyzeSearchQueries({
+          activeKeywords: data.activeKeywords,
+          searchTerms: data.searchTerms,
+          accountName: data.name ?? undefined,
+          targetLocations: data.targetLocations ?? null,
+          landingPageUrl: data.landingPageUrl ?? null,
+          relevantBrandTerms: data.relevantBrandTerms ?? null,
+          competitorBrands: data.competitorBrands,
+          excludePatterns: data.excludePatterns,
+          customRules: data.customRules,
+          minConversionsForNewKeyword: data.minConversionsForNewKeyword ?? 1,
+        });
+
+        const relevantCount = results.filter((r) => r.relevance === "Relevant").length;
+        const irrelevantCount = results.filter((r) => r.relevance === "Irrelevant").length;
+        const newKeywordCount = results.filter((r) => r.addAsKeyword).length;
+        const competitorCount = results.filter((r) => r.isCompetitor).length;
+
+        await db.update(analyses).set({
+          status: "completed",
+          totalTerms: results.length,
+          relevantCount,
+          irrelevantCount,
+          newKeywordCount,
+          competitorCount,
+          results: JSON.stringify(results),
+        }).where(eq(analyses.id, row.id));
+      } catch (err) {
+        logger.error({ err, analysisId: row.id }, "Re-run analysis failed");
+        await db.update(analyses).set({
+          status: "failed",
+          errorMessage: err instanceof Error ? err.message : "Unknown error",
+        }).where(eq(analyses.id, row.id));
+      }
+    },
+  });
+  processQueue();
+});
+
 router.post("/analyses/:id/chat", async (req, res): Promise<void> => {
   const params = GetAnalysisParams.safeParse(req.params);
   if (!params.success) {

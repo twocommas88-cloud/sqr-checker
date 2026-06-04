@@ -854,6 +854,76 @@ export const useChatWithAnalysis = <TError = ErrorType<void>,
       return useMutation(getChatWithAnalysisMutationOptions(options));
     }
 
+export const getRerunAnalysisUrl = (id: number,) => {
+
+
+
+
+  return `/api/analyses/${id}/rerun`
+}
+
+/**
+ * @summary Re-run an existing analysis with the same inputs using the latest AI logic
+ */
+export const rerunAnalysis = async (id: number, options?: RequestInit): Promise<Analysis> => {
+
+  return customFetch<Analysis>(getRerunAnalysisUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRerunAnalysisMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rerunAnalysis>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rerunAnalysis>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['rerunAnalysis'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rerunAnalysis>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  rerunAnalysis(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RerunAnalysisMutationResult = NonNullable<Awaited<ReturnType<typeof rerunAnalysis>>>
+
+    export type RerunAnalysisMutationError = ErrorType<void>
+
+    /**
+ * @summary Re-run an existing analysis with the same inputs using the latest AI logic
+ */
+export const useRerunAnalysis = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rerunAnalysis>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rerunAnalysis>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRerunAnalysisMutationOptions(options));
+    }
+
 export const getGetAnalysisStatsUrl = () => {
 
 

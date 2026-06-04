@@ -213,6 +213,27 @@ paths:
         "404":
           description: Not found
 
+  /analyses/{id}/rerun:
+    post:
+      operationId: rerunAnalysis
+      tags: [analyses]
+      summary: Re-run an existing analysis with the same inputs using the latest AI logic
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Analysis reset and re-queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+        "404":
+          description: Not found
+
   /analyses/stats:
     get:
       operationId: getAnalysisStats

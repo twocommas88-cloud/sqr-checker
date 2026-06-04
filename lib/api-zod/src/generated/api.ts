@@ -275,6 +275,56 @@ export const ChatWithAnalysisResponse = zod.object({
 
 
 /**
+ * @summary Re-run an existing analysis with the same inputs using the latest AI logic
+ */
+export const RerunAnalysisParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RerunAnalysisResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "status": zod.enum(['pending', 'processing', 'completed', 'failed']),
+  "ruleSetId": zod.number().nullish(),
+  "activeKeywords": zod.string().optional().describe('The raw active keywords string used for this analysis'),
+  "searchTerms": zod.string().optional().describe('The raw search terms string used for this analysis'),
+  "targetLocations": zod.string().nullish().describe('Target service locations used for this analysis'),
+  "landingPageUrl": zod.string().nullish().describe('Landing page URL used for this analysis'),
+  "relevantBrandTerms": zod.string().nullish().describe('Brand terms that should always be considered relevant for this analysis'),
+  "competitorBrands": zod.array(zod.string()).optional(),
+  "excludePatterns": zod.array(zod.string()).optional(),
+  "customRules": zod.array(zod.string()).optional(),
+  "minConversionsForNewKeyword": zod.number().optional(),
+  "totalTerms": zod.number().optional(),
+  "relevantCount": zod.number().optional(),
+  "irrelevantCount": zod.number().optional(),
+  "newKeywordCount": zod.number().optional(),
+  "competitorCount": zod.number().optional(),
+  "results": zod.array(zod.object({
+  "searchTerm": zod.string(),
+  "impressions": zod.number().nullish(),
+  "clicks": zod.number().nullish(),
+  "conversions": zod.number().nullish(),
+  "cost": zod.number().nullish(),
+  "relevance": zod.enum(['Relevant', 'Irrelevant']),
+  "reason": zod.string(),
+  "addLevel": zod.enum(['Campaign', 'Ad Group', 'None']),
+  "addAsKeyword": zod.boolean(),
+  "suggestedAdGroup": zod.string().nullable(),
+  "isCompetitor": zod.boolean(),
+  "matchedKeyword": zod.string().nullish(),
+  "outOfAreaLocation": zod.string().nullish().describe('The specific location word\/phrase in the search term that is outside the target service area'),
+  "relevanceScore": zod.number().nullish().describe('AI-assessed relevance score from 0-100. Low scores (0-30) = broad\/borderline terms. High scores (70-100) = strong match with active keywords.'),
+  "suggestedNegativeTerm": zod.string().nullish().describe('The specific irrelevant word\/phrase to add as a negative keyword when the term contains a brand name + an irrelevant modifier (e.g., \"how to\" or \"careers\"). NOT the full search term. Only set when the term contains BOTH a brand name AND an irrelevant modifier.'),
+  "translation": zod.string().nullish().describe('English translation of the search term if it is not in English. Used for relevance analysis against the active keywords.')
+})),
+  "errorMessage": zod.string().nullish(),
+  "explanation": zod.string().nullish().describe('Explanation of the last AI chat modification, if any'),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary Get aggregate stats across all analyses
  */
 export const GetAnalysisStatsResponse = zod.object({
