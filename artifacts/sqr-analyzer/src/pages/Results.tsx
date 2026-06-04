@@ -106,34 +106,34 @@ function getActiveKeywordWords(activeKeywords: string): Set<string> {
 }
 
 // Core service words that should NEVER be suggested as negatives
-const CORE_SERVICE_WORDS = new Set([
-  "junk", "removal", "hauling", "service", "services", "cleaning", "movers",
-  "moving", "disposal", "waste", "trash", "rubbish", "debris", "clutter",
-  "pickup", "pick", "up", "haul", "remove", "clean", "move",
-  "local", "near", "me", "cheap", "affordable", "best", "top", "fast",
-  "quick", "same", "day", "next", "emergency", "same-day", "next-day",
-  "furniture", "appliance", "mattress", "couch", "sofa", "refrigerator",
-  "fridge", "washer", "dryer", "tv", "television", "yard", "garage",
-  "basement", "attic", "estate", "foreclosure", "office", "commercial",
-  "residential", "home", "house", "apartment", "condo", "storage",
-  "unit", "container", "bin", "bag", "load", "dump", "landfill",
-  "recycling", "donate", "donation", "charity", "salvation", "goodwill",
-  "restore", "renovation", "construction", "demolition", "remodel",
-  "contractor", "builder", "handyman", "maintenance", "repair",
-]);
+// These are derived from the active keywords to be business-agnostic
+function getCoreServiceWords(activeKeywords: string): Set<string> {
+  const words = new Set<string>();
+  const phrases = parseActiveKeywordPhrases(activeKeywords);
+  for (const phrase of phrases) {
+    for (const w of phrase.split(/\s+/)) {
+      if (w.length > 2) words.add(w);
+    }
+  }
+  // Also add common "near me" style words that are always relevant
+  const genericRelevant = ["local", "near", "me", "cheap", "affordable", "best", "top", "fast", "quick", "same", "day", "next", "emergency"];
+  for (const w of genericRelevant) words.add(w);
+  return words;
+}
 
-function conflictsWithActiveKeywords(ngram: string, activeKwWords: Set<string>): boolean {
+function conflictsWithActiveKeywords(ngram: string, activeKwWords: Set<string>, coreServiceWords: Set<string>): boolean {
   // A 1-word negative "ngram" is a conflict if it is one of the individual words
   // that appears in any active keyword. E.g. if "junk" is a keyword word, don't
   // suggest "junk" as a negative term.
   if (activeKwWords.has(ngram)) return true;
-  // Also reject core service words that are almost always relevant
-  if (CORE_SERVICE_WORDS.has(ngram)) return true;
+  // Also reject core service words derived from the active keywords — business-agnostic
+  if (coreServiceWords.has(ngram)) return true;
   return false;
 }
 
 function extractNgrams(irrelevantTerms: string[], activeKeywords: string): string[] {
   const activeKwWords = getActiveKeywordWords(activeKeywords);
+  const coreServiceWords = getCoreServiceWords(activeKeywords);
   const freq: Record<string, number> = {};
 
   for (const term of irrelevantTerms) {
@@ -152,7 +152,7 @@ function extractNgrams(irrelevantTerms: string[], activeKeywords: string): strin
   return Object.entries(freq)
     .filter(([ngram, count]) => {
       if (count < 3) return false; // must appear in 3+ irrelevant terms
-      if (conflictsWithActiveKeywords(ngram, activeKwWords)) return false;
+      if (conflictsWithActiveKeywords(ngram, activeKwWords, coreServiceWords)) return false;
       return true;
     })
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
@@ -675,96 +675,98 @@ export default function Results() {
           {/* Table */}
           <div className="flex-1 overflow-auto px-8 pb-8">
             <div className="border border-border rounded-xl overflow-hidden">
-              <table className="w-full text-sm min-w-[1500px]">
-                <thead className="bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  <tr>
-                    <th className="text-left px-4 py-3 w-[260px] min-w-[220px]">Search Term</th>
-                    <th className="text-left px-3 py-3 w-[120px]">Campaign</th>
-                    <th className="text-left px-3 py-3 w-[120px]">Ad Group</th>
-                    <th className="text-right px-3 py-3 w-[70px]">Impr.</th>
-                    <th className="text-right px-3 py-3 w-[60px]">Clicks</th>
-                    <th className="text-right px-3 py-3 w-[60px]">Conv.</th>
-                    <th className="text-right px-3 py-3 w-[60px]">Cost</th>
-                    <th className="text-left px-3 py-3 w-[90px]">Relevance</th>
-                    <th className="text-left px-3 py-3">Reason</th>
-                    <th className="text-left px-3 py-3 w-[90px]">Add Level</th>
-                    <th className="text-left px-3 py-3 w-[70px]">New KW?</th>
-                    <th className="text-left px-3 py-3 w-[110px]">Ad Group</th>
-                    <th className="text-left px-3 py-3 w-[70px]">Comp.</th>
-                    <th className="text-left px-3 py-3 w-[100px]">Neg. N-gram</th>
-                    <th className="text-left px-3 py-3 w-[100px]">Out-of-Area</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filtered.length === 0 ? (
-                    <tr><td colSpan={15} className="px-4 py-10 text-center text-muted-foreground text-sm">No results match your filters</td></tr>
-                  ) : filtered.map((r, i) => {
-                    const matchedNgram = r.relevance === "Irrelevant" ? findMatchingNgram(r.searchTerm, ngrams) : null;
-                    return (
-                      <tr key={i} className="hover:bg-muted/20 transition-colors" data-testid={`row-result-${i}`}>
-                        <td className="px-4 py-2.5 font-medium text-foreground w-[260px] min-w-[220px]">
-                          <span className="break-words block" title={r.searchTerm}>{r.searchTerm}</span>
-                          {r.matchedKeyword && (
-                            <span className="text-xs text-muted-foreground truncate block" title={r.matchedKeyword}>→ {r.matchedKeyword}</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground truncate" title={r.campaignName ?? ""}>{r.campaignName ?? "—"}</td>
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground truncate" title={r.adGroupName ?? ""}>{r.adGroupName ?? "—"}</td>
-                        <td className="px-3 py-2.5 text-right text-muted-foreground">{r.impressions?.toLocaleString() ?? "—"}</td>
-                        <td className="px-3 py-2.5 text-right text-muted-foreground">{r.clicks?.toLocaleString() ?? "—"}</td>
-                        <td className="px-3 py-2.5 text-right text-muted-foreground">{r.conversions ?? "—"}</td>
-                        <td className="px-3 py-2.5 text-right text-muted-foreground">{r.cost != null ? `$${r.cost.toFixed(2)}` : "—"}</td>
-                        <td className="px-3 py-2.5">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                            r.relevance === "Relevant" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-                          }`} data-testid={`relevance-${i}`}>
-                            {r.relevance}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-muted-foreground text-xs max-w-[200px]">
-                          <span title={r.reason}>{r.reason}</span>
-                        </td>
-                        <td className="px-3 py-2.5">
-                          {r.addLevel !== "None" ? (
-                            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                              r.addLevel === "Campaign" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"
-                            }`} data-testid={`add-level-${i}`}>
-                              {r.addLevel}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[1200px]">
+                  <thead className="bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    <tr>
+                      <th className="text-left px-4 py-3 w-[220px] min-w-[200px] sticky left-0 bg-muted/50 z-10">Search Term</th>
+                      <th className="text-right px-3 py-3 w-[70px]">Impr.</th>
+                      <th className="text-right px-3 py-3 w-[60px]">Clicks</th>
+                      <th className="text-right px-3 py-3 w-[60px]">Conv.</th>
+                      <th className="text-right px-3 py-3 w-[60px]">Cost</th>
+                      <th className="text-left px-3 py-3 w-[90px]">Relevance</th>
+                      <th className="text-left px-3 py-3 w-[160px]">Reason</th>
+                      <th className="text-left px-3 py-3 w-[90px]">Add Level</th>
+                      <th className="text-left px-3 py-3 w-[70px]">New KW?</th>
+                      <th className="text-left px-3 py-3 w-[110px]">Ad Group</th>
+                      <th className="text-left px-3 py-3 w-[70px]">Comp.</th>
+                      <th className="text-left px-3 py-3 w-[100px]">Neg. N-gram</th>
+                      <th className="text-left px-3 py-3 w-[100px]">Out-of-Area</th>
+                      <th className="text-left px-3 py-3 w-[120px]">Campaign</th>
+                      <th className="text-left px-3 py-3 w-[120px]">Ad Group</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filtered.length === 0 ? (
+                      <tr><td colSpan={15} className="px-4 py-10 text-center text-muted-foreground text-sm">No results match your filters</td></tr>
+                    ) : filtered.map((r, i) => {
+                      const matchedNgram = r.relevance === "Irrelevant" ? findMatchingNgram(r.searchTerm, ngrams) : null;
+                      return (
+                        <tr key={i} className="hover:bg-muted/20 transition-colors" data-testid={`row-result-${i}`}>
+                          <td className="px-4 py-2.5 font-medium text-foreground w-[220px] min-w-[200px] sticky left-0 bg-card z-10">
+                            <span className="break-words block" title={r.searchTerm}>{r.searchTerm}</span>
+                            {r.matchedKeyword && (
+                              <span className="text-xs text-muted-foreground truncate block" title={r.matchedKeyword}>→ {r.matchedKeyword}</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-muted-foreground">{r.impressions?.toLocaleString() ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-right text-muted-foreground">{r.clicks?.toLocaleString() ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-right text-muted-foreground">{r.conversions ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-right text-muted-foreground">{r.cost != null ? `$${r.cost.toFixed(2)}` : "—"}</td>
+                          <td className="px-3 py-2.5">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                              r.relevance === "Relevant" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                            }`} data-testid={`relevance-${i}`}>
+                              {r.relevance}
                             </span>
-                          ) : <span className="text-muted-foreground text-xs">—</span>}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <span className={`text-xs font-medium ${r.addAsKeyword ? "text-primary" : "text-muted-foreground"}`} data-testid={`add-keyword-${i}`}>
-                            {r.addAsKeyword ? "Yes" : "No"}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground" data-testid={`ad-group-${i}`}>
-                          {r.suggestedAdGroup ?? "—"}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          {r.isCompetitor ? (
-                            <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded" data-testid={`is-competitor-${i}`}>Yes</span>
-                          ) : <span className="text-muted-foreground text-xs">—</span>}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          {matchedNgram ? (
-                            <code className="text-xs bg-amber-50 border border-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-mono" title={`Neg. n-gram: "${matchedNgram}"`}>
-                              "{matchedNgram}"
-                            </code>
-                          ) : <span className="text-muted-foreground text-xs">—</span>}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          {r.outOfAreaLocation ? (
-                            <span className="text-xs bg-purple-50 border border-purple-200 text-purple-700 px-1.5 py-0.5 rounded font-medium" title={`Out of area: ${r.outOfAreaLocation}`}>
-                              {r.outOfAreaLocation}
+                          </td>
+                          <td className="px-3 py-2.5 text-muted-foreground text-xs w-[160px]">
+                            <span className="truncate block" title={r.reason}>{r.reason}</span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {r.addLevel !== "None" ? (
+                              <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                                r.addLevel === "Campaign" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"
+                              }`} data-testid={`add-level-${i}`}>
+                                {r.addLevel}
+                              </span>
+                            ) : <span className="text-muted-foreground text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`text-xs font-medium ${r.addAsKeyword ? "text-primary" : "text-muted-foreground"}`} data-testid={`add-keyword-${i}`}>
+                              {r.addAsKeyword ? "Yes" : "No"}
                             </span>
-                          ) : <span className="text-muted-foreground text-xs">—</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground" data-testid={`ad-group-${i}`}>
+                            {r.suggestedAdGroup ?? "—"}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {r.isCompetitor ? (
+                              <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded" data-testid={`is-competitor-${i}`}>Yes</span>
+                            ) : <span className="text-muted-foreground text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {matchedNgram ? (
+                              <code className="text-xs bg-amber-50 border border-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-mono" title={`Neg. n-gram: "${matchedNgram}"`}>
+                                "{matchedNgram}"
+                              </code>
+                            ) : <span className="text-muted-foreground text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {r.outOfAreaLocation ? (
+                              <span className="text-xs bg-purple-50 border border-purple-200 text-purple-700 px-1.5 py-0.5 rounded font-medium" title={`Out of area: ${r.outOfAreaLocation}`}>
+                                {r.outOfAreaLocation}
+                              </span>
+                            ) : <span className="text-muted-foreground text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground truncate" title={r.campaignName ?? ""}>{r.campaignName ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground truncate" title={r.adGroupName ?? ""}>{r.adGroupName ?? "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

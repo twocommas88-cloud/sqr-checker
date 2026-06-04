@@ -251,9 +251,15 @@ async function analyzeTermsBatch(
 
   const locationSection = options.targetLocations?.trim()
     ? `\nTARGET SERVICE LOCATIONS: ${options.targetLocations.trim()}
-- Search terms that mention a specific location NOT in this list → Irrelevant (addLevel: "Campaign"), reason: "Outside target service area"
-- Search terms with no location or a location IN this list → treat as geographically relevant (location alone does not make a term irrelevant)
-- Generic location terms (e.g. "near me", "local") → geographically relevant\n`
+LOCATION MATCHING RULES — READ CAREFULLY:
+- The location list above may include: city names, state names, state abbreviations (e.g., "FL" means Florida), county names, ZIP codes, or radius descriptions (e.g., "50 miles around Austin", "within 30 miles of Dallas").
+- When matching locations, you MUST be flexible with: abbreviations, misspellings, partial matches, and common variants.
+  Examples: "FL" matches "Florida", "florida", "floridas"; "KY" matches "Kentucky", "kentucky", "kentuckys"; "NYC" matches "New York", "new york city", "ny".
+- Search terms that mention a specific location OUTSIDE the target area → Irrelevant (addLevel: "Campaign"), reason: "Outside target service area", and set outOfAreaLocation to the location name found.
+- Search terms with NO location or a location IN the target area → treat as geographically relevant (location alone does not make a term irrelevant).
+- Generic location terms (e.g. "near me", "local", "close by") → geographically relevant.
+- Specific addresses (e.g. "123 Main St, Austin TX") → if the city/area is in the target list, treat as relevant; if clearly outside, treat as irrelevant.
+- Radius descriptions: if a term mentions a location WITHIN the described radius (e.g., a city 20 miles from Austin when the radius is 50 miles), treat as relevant.\n`
     : "";
 
   const termsJson = JSON.stringify(
@@ -302,7 +308,8 @@ CRITICAL RULES FOR JSON OUTPUT:
 - The "reason" field MUST be a separate concise sentence (max 15 words). Never put the reason text inside the "relevance" field.
 - The "addAsKeyword" field MUST be false when the search term has 0 conversions. Only recommend as a new keyword when conversions > 0.
 - The "addLevel" field MUST be "None" when addAsKeyword is false.
-- Never suggest core service terms (e.g. "junk", "removal", "hauling", "disposal", "pickup", "pick up", "mattress", "furniture", "appliance", "estate", "cleanout") as negative terms — these are the core business terms and must remain Relevant.
+- Never suggest core service terms as negative terms — these are the words that define the business's primary offerings (e.g., terms from the active keywords list, words that represent the main products/services). Core business terms must remain Relevant.
+- For any business type (not just junk removal): identify what the ACTIVE KEYWORDS reveal as the core business terms and NEVER mark those as irrelevant or suggest them as negatives.
 - Keep the exact JSON field order shown above.
 
 outOfAreaLocation: If the term is flagged as outside the target service area, set this to the specific location word or phrase found in the search term that is NOT in the target locations list (e.g. "lewisburg", "nashville"). Otherwise null.`;
