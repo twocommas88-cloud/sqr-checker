@@ -384,6 +384,18 @@ export default function Results() {
   const hasFilters = Object.values(filters).some(Boolean);
   const results = (analysis?.results ?? []) as AnalysisResult[];
 
+  const competitors = results.filter((r) => r.isCompetitor);
+  const irrelevantNonCompetitor = results.filter((r) => r.relevance === "Irrelevant" && !r.isCompetitor);
+
+  const ngrams = useMemo(
+    () => extractNgrams(
+      irrelevantNonCompetitor.map((r) => r.searchTerm),
+      analysis?.activeKeywords ?? ""
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [irrelevantNonCompetitor.length, analysis?.activeKeywords]
+  );
+
   const filtered = results.filter((r) => {
     if (filters.relevance && r.relevance !== filters.relevance) return false;
     if (filters.addLevel && r.addLevel !== filters.addLevel) return false;
@@ -399,18 +411,6 @@ export default function Results() {
     if (filters.search && !r.searchTerm.toLowerCase().includes(filters.search.toLowerCase())) return false;
     return true;
   });
-
-  const competitors = results.filter((r) => r.isCompetitor);
-  const irrelevantNonCompetitor = results.filter((r) => r.relevance === "Irrelevant" && !r.isCompetitor);
-
-  const ngrams = useMemo(
-    () => extractNgrams(
-      irrelevantNonCompetitor.map((r) => r.searchTerm),
-      analysis?.activeKeywords ?? ""
-    ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [irrelevantNonCompetitor.length, analysis?.activeKeywords]
-  );
 
   function handleDelete() {
     if (!confirm("Delete this analysis? This cannot be undone.")) return;
