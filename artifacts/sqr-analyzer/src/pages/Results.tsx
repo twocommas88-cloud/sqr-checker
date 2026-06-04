@@ -65,12 +65,14 @@ function parseActiveKeywordPhrases(activeKeywords: string): Set<string> {
       hasTabFormat = true;
       const col0 = parts[0].trim().toLowerCase();
 
-      if (col0 === "keyword status" || col0 === "status") {
+      // Header row detection
+      if (col0 === "keyword status" || col0 === "status" || col0 === "keyword") {
         kwColIndex = parts.findIndex((p) => p.trim().toLowerCase() === "keyword");
         if (kwColIndex < 0) kwColIndex = 1;
         continue;
       }
 
+      // Data row where first column is the status (e.g., "enabled")
       if (STATUS_WORDS.has(col0) || MATCH_TYPE_WORDS.has(col0)) {
         const rawKw = hasTabFormat && kwColIndex === 0 ? parts[1] : parts[kwColIndex];
         if (!rawKw) continue;
@@ -81,8 +83,23 @@ function parseActiveKeywordPhrases(activeKeywords: string): Set<string> {
         if (kw.length > 1) kwSet.add(kw);
         continue;
       }
+
+      // Data row where first column IS the keyword itself (no status column)
+      // This happens when the format is: keyword | status | match_type
+      if (kwColIndex === 0) {
+        const rawKw = parts[0].trim();
+        if (rawKw) {
+          let kw = rawKw;
+          kw = kw.replace(/^\[(.+)\]$/, "$1");
+          kw = kw.replace(/^"(.+)"$/, "$1");
+          kw = kw.replace(/\+/g, "").toLowerCase().trim();
+          if (kw.length > 1) kwSet.add(kw);
+        }
+        continue;
+      }
     }
 
+    // Non-tab-separated or single-column lines
     if (!hasTabFormat || parts.length < 2) {
       const rawLines = trimmed.split(",");
       for (const raw of rawLines) {
