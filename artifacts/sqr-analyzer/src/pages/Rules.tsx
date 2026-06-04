@@ -12,6 +12,9 @@ import { Plus, Edit2, Trash2, Loader2, X, Settings } from "lucide-react";
 interface FormData {
   name: string;
   accountName: string;
+  landingPageUrl: string;
+  targetLocations: string;
+  activeKeywords: string;
   minConversionsForNewKeyword: number;
   customRules: string;
 }
@@ -20,6 +23,10 @@ interface RuleSetForm {
   id?: number;
   name: string;
   accountName: string;
+  landingPageUrl: string;
+  targetLocations: string;
+  relevantBrandTerms: string[];
+  activeKeywords: string;
   competitorBrands: string[];
   excludePatterns: string[];
   minConversionsForNewKeyword: number;
@@ -40,11 +47,15 @@ function RuleSetFormPanel({
 
   const [competitorBrands, setCompetitorBrands] = useState<string[]>(initial?.competitorBrands ?? []);
   const [excludePatterns, setExcludePatterns] = useState<string[]>(initial?.excludePatterns ?? []);
+  const [relevantBrandTerms, setRelevantBrandTerms] = useState<string[]>(initial?.relevantBrandTerms ?? []);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       name: initial?.name ?? "",
       accountName: initial?.accountName ?? "",
+      landingPageUrl: initial?.landingPageUrl ?? "",
+      targetLocations: initial?.targetLocations ?? "",
+      activeKeywords: initial?.activeKeywords ?? "",
       minConversionsForNewKeyword: initial?.minConversionsForNewKeyword ?? 1,
       customRules: initial?.customRules ?? "",
     }
@@ -58,6 +69,10 @@ function RuleSetFormPanel({
     const payload = {
       name: data.name,
       accountName: data.accountName || undefined,
+      landingPageUrl: data.landingPageUrl || undefined,
+      targetLocations: data.targetLocations || undefined,
+      relevantBrandTerms: relevantBrandTerms.length > 0 ? relevantBrandTerms.join(", ") : undefined,
+      activeKeywords: data.activeKeywords || undefined,
       competitorBrands,
       excludePatterns,
       customRules: customRulesArr,
@@ -114,6 +129,46 @@ function RuleSetFormPanel({
               placeholder="e.g. Nike US Brand"
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
               data-testid="input-account-name"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Landing Page URL</label>
+            <input
+              {...register("landingPageUrl")}
+              placeholder="https://www.yourwebsite.com"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              data-testid="input-ruleset-landing-page"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Target Locations</label>
+            <input
+              {...register("targetLocations")}
+              placeholder="e.g. Dallas, Frisco, McKinney, Allen, Plano, DFW, Texas"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              data-testid="input-ruleset-target-locations"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Relevant Brand Terms</label>
+            <p className="text-xs text-muted-foreground mb-2">Enter your brand name(s). The AI will recognize variations, misspellings, abbreviations, and combined forms.</p>
+            <TagInput value={relevantBrandTerms} onChange={setRelevantBrandTerms} placeholder="your brand name..." />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Active Keywords</label>
+            <p className="text-xs text-muted-foreground mb-2">Paste from Google Ads — full export or one keyword per line with match type and ad group.</p>
+            <textarea
+              {...register("activeKeywords")}
+              rows={4}
+              placeholder="running shoes | exact | Running Shoes\nbuy sneakers online | phrase | General"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-ring resize-none"
+              data-testid="textarea-ruleset-active-keywords"
             />
           </div>
         </div>
@@ -198,6 +253,10 @@ export default function Rules() {
       id: rs.id,
       name: rs.name,
       accountName: rs.accountName ?? "",
+      landingPageUrl: rs.landingPageUrl ?? "",
+      targetLocations: rs.targetLocations ?? "",
+      relevantBrandTerms: rs.relevantBrandTerms ? rs.relevantBrandTerms.split(",").map((s) => s.trim()).filter(Boolean) : [],
+      activeKeywords: rs.activeKeywords ?? "",
       competitorBrands: rs.competitorBrands ?? [],
       excludePatterns: rs.excludePatterns ?? [],
       minConversionsForNewKeyword: rs.minConversionsForNewKeyword ?? 1,
@@ -279,6 +338,30 @@ export default function Rules() {
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                  {rs.landingPageUrl && (
+                    <div>
+                      <span className="font-medium text-foreground">Landing Page: </span>
+                      {rs.landingPageUrl}
+                    </div>
+                  )}
+                  {rs.targetLocations && (
+                    <div>
+                      <span className="font-medium text-foreground">Locations: </span>
+                      {rs.targetLocations}
+                    </div>
+                  )}
+                  {rs.relevantBrandTerms && (
+                    <div>
+                      <span className="font-medium text-foreground">Brand Terms: </span>
+                      {rs.relevantBrandTerms}
+                    </div>
+                  )}
+                  {rs.activeKeywords && (
+                    <div>
+                      <span className="font-medium text-foreground">Active Keywords: </span>
+                      {rs.activeKeywords.split("\n").length} lines
+                    </div>
+                  )}
                   {rs.competitorBrands && rs.competitorBrands.length > 0 && (
                     <div>
                       <span className="font-medium text-foreground">Competitors: </span>

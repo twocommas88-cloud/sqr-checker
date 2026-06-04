@@ -88,7 +88,10 @@ router.put("/rules/:id", async (req, res): Promise<void> => {
       ...(competitorBrands !== undefined && { competitorBrands: JSON.stringify(competitorBrands) }),
       ...(excludePatterns !== undefined && { excludePatterns: JSON.stringify(excludePatterns) }),
       ...(customRules !== undefined && { customRules: JSON.stringify(customRules) }),
+      ...(rest.landingPageUrl !== undefined && { landingPageUrl: rest.landingPageUrl }),
+      ...(rest.targetLocations !== undefined && { targetLocations: rest.targetLocations }),
       ...(rest.relevantBrandTerms !== undefined && { relevantBrandTerms: rest.relevantBrandTerms }),
+      ...(rest.activeKeywords !== undefined && { activeKeywords: rest.activeKeywords }),
       updatedAt: new Date(),
     })
     .where(eq(ruleSets.id, params.data.id))

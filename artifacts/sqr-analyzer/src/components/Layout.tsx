@@ -1,10 +1,9 @@
 import { Link, useLocation } from "wouter";
-import { BarChart3, Search, History, Settings, ChevronRight } from "lucide-react";
+import { Search, History, Settings, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { path: "/", label: "Dashboard", icon: BarChart3 },
-  { path: "/analyze", label: "New Analysis", icon: Search },
+  { path: "/", label: "New Analysis", icon: Search },
   { path: "/history", label: "History", icon: History },
   { path: "/rules", label: "Rule Sets", icon: Settings },
 ];
