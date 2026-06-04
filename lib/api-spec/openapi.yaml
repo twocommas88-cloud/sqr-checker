@@ -386,6 +386,9 @@ components:
         relevanceScore:
           type: ["number", "null"]
           description: AI-assessed relevance score from 0-100. Low scores (0-30) = broad/borderline terms. High scores (70-100) = strong match with active keywords.
+        suggestedNegativeTerm:
+          type: ["string", "null"]
+          description: The specific irrelevant word/phrase to add as a negative keyword when the term contains a brand name + an irrelevant modifier (e.g., "how to" or "careers"). NOT the full search term. Only set when the term contains BOTH a brand name AND an irrelevant modifier.
 
     Analysis:
       type: object

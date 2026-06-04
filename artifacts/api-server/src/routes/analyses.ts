@@ -261,8 +261,8 @@ ${additionalContext ? `\nAdditional context: ${additionalContext}\n` : ""}
 Please return a JSON object with two fields:
 1. "explanation": A brief explanation of what changes will be made (1-2 sentences). Be specific about the match terms.
 2. "rules": An array of rule objects. Each rule must have:
-   - "field": Which field to modify ("relevance", "addLevel", "isCompetitor", "addAsKeyword", "outOfAreaLocation")
-   - "value": The new value to set (for outOfAreaLocation, use null to clear it, or a string to set it)
+   - "field": Which field to modify ("relevance", "addLevel", "isCompetitor", "addAsKeyword", "outOfAreaLocation", "suggestedNegativeTerm", "reason")
+   - "value": The new value to set (for outOfAreaLocation or suggestedNegativeTerm, use null to clear it, or a string to set it)
    - "match": One of:
      - { "type": "contains", "terms": ["word1", "word2"] } — applies to terms containing ANY of these words
      - { "type": "exact", "terms": ["exact term"] } — applies to exact matches
@@ -369,6 +369,8 @@ Return ONLY the JSON object, no markdown, no explanation outside the JSON.`;
           updated.addAsKeyword = rule.value;
         } else if (rule.field === "outOfAreaLocation") {
           updated.outOfAreaLocation = rule.value === null ? null : (typeof rule.value === "string" ? rule.value : null);
+        } else if (rule.field === "suggestedNegativeTerm") {
+          updated.suggestedNegativeTerm = rule.value === null ? null : (typeof rule.value === "string" ? rule.value : null);
         } else if (rule.field === "reason" && typeof rule.value === "string") {
           updated.reason = rule.value;
         }

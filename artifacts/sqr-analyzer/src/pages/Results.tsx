@@ -40,6 +40,7 @@ type AnalysisResult = {
   matchedKeyword?: string | null;
   outOfAreaLocation?: string | null;
   relevanceScore?: number | null;
+  suggestedNegativeTerm?: string | null;
 };
 
 // ── N-gram extraction ────────────────────────────────────────────────────────
@@ -173,7 +174,7 @@ function findMatchingNgram(term: string, ngrams: string[]): string | null {
 // ── CSV download ─────────────────────────────────────────────────────────────
 
 function downloadCSV(results: AnalysisResult[], name: string) {
-  const headers = ["Search Term","Campaign Name","Ad Group Name","Impressions","Clicks","Conversions","Cost","Relevance","Reason","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Out-of-Area Location"];
+  const headers = ["Search Term","Campaign Name","Ad Group Name","Impressions","Clicks","Conversions","Cost","Relevance","Reason","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Suggested Negative Term","Out-of-Area Location"];
   const rows = results.map((r) => [
     `"${r.searchTerm.replace(/"/g, '""')}"`,
     r.campaignName ? `"${r.campaignName.replace(/"/g, '""')}"` : "",
@@ -189,6 +190,7 @@ function downloadCSV(results: AnalysisResult[], name: string) {
     r.suggestedAdGroup ? `"${r.suggestedAdGroup.replace(/"/g, '""')}"` : "",
     r.isCompetitor ? "Yes" : "No",
     r.matchedKeyword ? `"${r.matchedKeyword.replace(/"/g, '""')}"` : "",
+    r.suggestedNegativeTerm ? `"${r.suggestedNegativeTerm.replace(/"/g, '""')}"` : "",
     r.outOfAreaLocation ? `"${r.outOfAreaLocation.replace(/"/g, '""')}"` : "",
   ].join(","));
   const csv = [headers.join(","), ...rows].join("\n");
@@ -202,7 +204,7 @@ function downloadCSV(results: AnalysisResult[], name: string) {
 }
 
 async function copyForSheets(results: AnalysisResult[], name: string): Promise<void> {
-  const headers = ["Search Term","Campaign Name","Ad Group Name","Impressions","Clicks","Conversions","Cost","Relevance","Reason","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Out-of-Area Location"];
+  const headers = ["Search Term","Campaign Name","Ad Group Name","Impressions","Clicks","Conversions","Cost","Relevance","Reason","Add Level","Add as Keyword","Suggested Ad Group","Is Competitor","Matched Keyword","Suggested Negative Term","Out-of-Area Location"];
   const rows = results.map((r) => [
     r.searchTerm,
     r.campaignName ?? "",
@@ -218,6 +220,7 @@ async function copyForSheets(results: AnalysisResult[], name: string): Promise<v
     r.suggestedAdGroup ?? "",
     r.isCompetitor ? "Yes" : "No",
     r.matchedKeyword ?? "",
+    r.suggestedNegativeTerm ?? "",
     r.outOfAreaLocation ?? "",
   ].join("\t"));
   const tsv = [headers.join("\t"), ...rows].join("\n");
@@ -719,6 +722,7 @@ export default function Results() {
                       <th className="text-left px-3 py-3 w-[110px]">Add as Neg</th>
                       <th className="text-left px-3 py-3 w-[70px]">Comp.</th>
                       <th className="text-left px-3 py-3 w-[100px]">Neg. N-gram</th>
+                      <th className="text-left px-3 py-3 w-[120px]">Suggested Neg</th>
                       <th className="text-left px-3 py-3 w-[100px]">Out-of-Area</th>
                       <th className="text-left px-3 py-3 w-[120px]">Campaign</th>
                       <th className="text-left px-3 py-3 w-[120px]">Ad Group</th>
@@ -726,7 +730,7 @@ export default function Results() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filtered.length === 0 ? (
-                      <tr><td colSpan={15} className="px-4 py-10 text-center text-muted-foreground text-sm">No results match your filters</td></tr>
+                      <tr><td colSpan={16} className="px-4 py-10 text-center text-muted-foreground text-sm">No results match your filters</td></tr>
                     ) : filtered.map((r, i) => {
                       const matchedNgram = r.relevance === "Irrelevant" ? findMatchingNgram(r.searchTerm, ngrams) : null;
                       return (
@@ -795,6 +799,13 @@ export default function Results() {
                               <code className="text-xs bg-amber-50 border border-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-mono" title={`Neg. n-gram: "${matchedNgram}"`}>
                                 "{matchedNgram}"
                               </code>
+                            ) : <span className="text-muted-foreground text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {r.suggestedNegativeTerm ? (
+                              <span className="text-xs bg-red-50 border border-red-200 text-red-700 px-1.5 py-0.5 rounded font-medium" title={`Suggested negative term: "${r.suggestedNegativeTerm}"`}>
+                                "{r.suggestedNegativeTerm}"
+                              </span>
                             ) : <span className="text-muted-foreground text-xs">—</span>}
                           </td>
                           <td className="px-3 py-2.5">

@@ -27,6 +27,8 @@ export interface SearchTermResult {
   matchedKeyword?: string | null;
   outOfAreaLocation?: string | null;
   relevanceScore?: number | null;
+  /** Suggested negative term — the specific irrelevant word/phrase to add as a negative keyword (e.g., "how to" or "careers"), NOT the full search term. Only set when the term contains a brand name + an irrelevant modifier. */
+  suggestedNegativeTerm?: string | null;
 }
 
 export interface AnalysisOptions {
@@ -324,7 +326,7 @@ Search terms to analyze:
 ${termsJson}
 
 Return ONLY a valid JSON array with exactly ${terms.length} objects, one per search term, in this exact format — no markdown, no explanation:
-[{"searchTerm":"...","relevance":"Relevant","reason":"...","addLevel":"None","addAsKeyword":false,"suggestedAdGroup":null,"isCompetitor":false,"matchedKeyword":"...","outOfAreaLocation":null,"relevanceScore":85}]
+[{"searchTerm":"...","relevance":"Relevant","reason":"...","addLevel":"None","addAsKeyword":false,"suggestedAdGroup":null,"isCompetitor":false,"matchedKeyword":"...","outOfAreaLocation":null,"relevanceScore":85,"suggestedNegativeTerm":null}]
 
 relevanceScore field: Assess how closely this search term matches the business's core offerings (0-100). Use this scale:
 - 90-100: Exact match or highly specific intent (e.g., "emergency plumbing repair" for a plumbing company)
@@ -342,6 +344,13 @@ CRITICAL RULES FOR JSON OUTPUT:
 - The "addLevel" field MUST be "None" when addAsKeyword is false.
 - Never suggest core service terms as negative terms — these are the words that define the business's primary offerings (e.g., terms from the active keywords list, words that represent the main products/services). Core business terms must remain Relevant.
 - For any business type (not just junk removal): identify what the ACTIVE KEYWORDS reveal as the core business terms and NEVER mark those as irrelevant or suggest them as negatives.
+- suggestedNegativeTerm: When the search term contains a brand name (own or relevant) PLUS an irrelevant modifier, set this to the specific IRRELEVANT word/phrase to add as a negative keyword. Examples:
+  - "Junk Bros how to" → "how to" (brand name is relevant, but "how to" is a non-commercial modifier)
+  - "Junk Bros careers" → "careers" (brand name is relevant, but "careers" is a non-commercial modifier)
+  - "Junk Bros near me" → null (both are relevant — no negative needed)
+  - "how to dispose junk" → null (no brand name present, just a generic irrelevant term)
+  - ONLY set this when the term contains BOTH a brand name AND an irrelevant modifier. Otherwise null.
+  - The suggested negative term should be a SHORT PHRASE (1-2 words) that is the actual word to add as a negative keyword, NOT the full search term.
 - Keep the exact JSON field order shown above.
 
 outOfAreaLocation: If the term is flagged as outside the target service area, set this to the specific location word or phrase found in the search term that is NOT in the target locations list (e.g. "lewisburg", "nashville"). Otherwise null.`;
@@ -390,6 +399,7 @@ outOfAreaLocation: If the term is flagged as outside the target service area, se
     matchedKeyword: string | null;
     outOfAreaLocation: string | null;
     relevanceScore: number | null;
+    suggestedNegativeTerm: string | null;
   }>;
 
   try {

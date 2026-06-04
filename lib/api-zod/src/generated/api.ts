@@ -209,7 +209,8 @@ export const GetAnalysisResponse = zod.object({
   "isCompetitor": zod.boolean(),
   "matchedKeyword": zod.string().nullish(),
   "outOfAreaLocation": zod.string().nullish().describe('The specific location word\/phrase in the search term that is outside the target service area'),
-  "relevanceScore": zod.number().nullish().describe('AI-assessed relevance score from 0-100. Low scores (0-30) = broad\/borderline terms. High scores (70-100) = strong match with active keywords.')
+  "relevanceScore": zod.number().nullish().describe('AI-assessed relevance score from 0-100. Low scores (0-30) = broad\/borderline terms. High scores (70-100) = strong match with active keywords.'),
+  "suggestedNegativeTerm": zod.string().nullish().describe('The specific irrelevant word\/phrase to add as a negative keyword when the term contains a brand name + an irrelevant modifier (e.g., \"how to\" or \"careers\"). NOT the full search term. Only set when the term contains BOTH a brand name AND an irrelevant modifier.')
 })),
   "errorMessage": zod.string().nullish(),
   "explanation": zod.string().nullish().describe('Explanation of the last AI chat modification, if any'),
@@ -262,7 +263,8 @@ export const ChatWithAnalysisResponse = zod.object({
   "isCompetitor": zod.boolean(),
   "matchedKeyword": zod.string().nullish(),
   "outOfAreaLocation": zod.string().nullish().describe('The specific location word\/phrase in the search term that is outside the target service area'),
-  "relevanceScore": zod.number().nullish().describe('AI-assessed relevance score from 0-100. Low scores (0-30) = broad\/borderline terms. High scores (70-100) = strong match with active keywords.')
+  "relevanceScore": zod.number().nullish().describe('AI-assessed relevance score from 0-100. Low scores (0-30) = broad\/borderline terms. High scores (70-100) = strong match with active keywords.'),
+  "suggestedNegativeTerm": zod.string().nullish().describe('The specific irrelevant word\/phrase to add as a negative keyword when the term contains a brand name + an irrelevant modifier (e.g., \"how to\" or \"careers\"). NOT the full search term. Only set when the term contains BOTH a brand name AND an irrelevant modifier.')
 })),
   "errorMessage": zod.string().nullish(),
   "explanation": zod.string().nullish().describe('Explanation of the last AI chat modification, if any'),

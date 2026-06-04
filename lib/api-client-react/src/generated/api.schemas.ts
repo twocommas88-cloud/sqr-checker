@@ -125,6 +125,11 @@ export interface SearchTermResult {
      * @nullable
      */
   relevanceScore?: number | null;
+  /**
+     * The specific irrelevant word/phrase to add as a negative keyword when the term contains a brand name + an irrelevant modifier (e.g., "how to" or "careers"). NOT the full search term. Only set when the term contains BOTH a brand name AND an irrelevant modifier.
+     * @nullable
+     */
+  suggestedNegativeTerm?: string | null;
 }
 
 export type AnalysisStatus = typeof AnalysisStatus[keyof typeof AnalysisStatus];
