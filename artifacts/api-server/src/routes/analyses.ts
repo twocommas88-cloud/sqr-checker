@@ -290,13 +290,27 @@ Return ONLY the JSON object, no markdown, no explanation outside the JSON.`;
   });
 
   const content = response.choices[0]?.message?.content ?? "{}";
-  const match = content.match(/\{[\s\S]*\}/);
-  if (!match) {
+
+  // Robust JSON extraction for the rule response
+  let jsonText: string | null = null;
+  const firstBrace = content.indexOf("{");
+  const lastBrace = content.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    jsonText = content.slice(firstBrace, lastBrace + 1);
+  }
+  if (!jsonText && content.trim().startsWith("{") && content.trim().endsWith("}")) {
+    jsonText = content.trim();
+  }
+  if (!jsonText) {
+    const match = content.match(/\{[\s\S]*\}/);
+    if (match) jsonText = match[0];
+  }
+  if (!jsonText) {
     res.status(500).json({ error: "Could not parse AI response" });
     return;
   }
 
-  const parsedResponse = JSON.parse(match[0]) as {
+  let parsedResponse: {
     explanation?: string;
     rules?: Array<{
       field: string;
@@ -304,6 +318,21 @@ Return ONLY the JSON object, no markdown, no explanation outside the JSON.`;
       match: { type: "contains" | "exact" | "all"; terms?: string[] };
     }>;
   };
+
+  try {
+    parsedResponse = JSON.parse(jsonText);
+  } catch (err) {
+    const cleaned = jsonText
+      .replace(/,(\s*[\}\]])/g, "$1")
+      .replace(/\n/g, " ")
+      .replace(/\t/g, " ");
+    try {
+      parsedResponse = JSON.parse(cleaned);
+    } catch {
+      res.status(500).json({ error: "AI response is not valid JSON" });
+      return;
+    }
+  }
 
   // Apply rules to ALL results
   const updatedResults = existingResults.map((r) => {

@@ -333,10 +333,33 @@ outOfAreaLocation: If the term is flagged as outside the target service area, se
   });
 
   const content = response.choices[0]?.message?.content ?? "[]";
-  const match = content.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error("Could not parse AI response as JSON array");
 
-  const parsed = JSON.parse(match[0]) as Array<{
+  // Try to extract the JSON array — first find the outermost balanced array
+  let jsonText: string | null = null;
+
+  // Strategy 1: find the first '[' and the last ']' to capture the full array
+  const firstBracket = content.indexOf("[");
+  const lastBracket = content.lastIndexOf("]");
+  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+    jsonText = content.slice(firstBracket, lastBracket + 1);
+  }
+
+  // Strategy 2: if the whole content looks like an array, use it
+  if (!jsonText && content.trim().startsWith("[") && content.trim().endsWith("]")) {
+    jsonText = content.trim();
+  }
+
+  // Strategy 3: if nothing works, try a regex
+  if (!jsonText) {
+    const match = content.match(/\[[\s\S]*\]/);
+    if (match) jsonText = match[0];
+  }
+
+  if (!jsonText) {
+    throw new Error("Could not extract JSON array from AI response");
+  }
+
+  let parsed: Array<{
     searchTerm: string;
     relevance: "Relevant" | "Irrelevant";
     reason: string;
@@ -348,6 +371,31 @@ outOfAreaLocation: If the term is flagged as outside the target service area, se
     outOfAreaLocation: string | null;
     relevanceScore: number | null;
   }>;
+
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch (err) {
+    // Try to fix common AI JSON mistakes: trailing commas, unescaped quotes
+    const cleaned = jsonText
+      .replace(/,(\s*[\}\]])/g, "$1")          // remove trailing commas
+      .replace(/\n/g, " ")                     // remove newlines
+      .replace(/\t/g, " ");                    // remove tabs
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      // Try using the raw content instead of the extracted text
+      try {
+        const rawMatch = content.match(/\[[\s\S]*\]/);
+        if (rawMatch && rawMatch[0] !== jsonText) {
+          parsed = JSON.parse(rawMatch[0]);
+        } else {
+          throw new Error("AI response is not valid JSON");
+        }
+      } catch {
+        throw new Error("AI response is not valid JSON after all attempts: " + (err as Error).message);
+      }
+    }
+  }
 
   return parsed.map((item, i) => ({
     ...terms[i],
