@@ -42,6 +42,24 @@ export interface AnalysisOptions {
   landingPageUrl?: string | null;
 }
 
+// ── Location helper ───────────────────────────────────────────────────────────
+
+function normalizeTargetLocations(locations: string): string[] {
+  // Split by comma, semicolon, or newline
+  const parts = locations.split(/[,;\n]+/);
+  const normalized = new Set<string>();
+  for (const p of parts) {
+    const trimmed = p.trim();
+    if (trimmed) {
+      // Add the exact value (e.g., "TN", "Georgia", "Atlanta")
+      normalized.add(trimmed);
+      // Also add lowercased version for flexible matching
+      normalized.add(trimmed.toLowerCase());
+    }
+  }
+  return Array.from(normalized);
+}
+
 // ── Own-brand detection ───────────────────────────────────────────────────────
 
 // Generic service/business words that are NOT brand identifiers
@@ -258,6 +276,8 @@ LOCATION MATCHING RULES — READ CAREFULLY:
   Examples: "FL" matches "Florida", "florida", "floridas"; "KY" matches "Kentucky", "kentucky", "kentuckys"; "NYC" matches "New York", "new york city", "ny".
   IMPORTANT: The locations list may be entered with spaces only (e.g., "FL KY Nashville"). When the list is space-separated, treat each word/abbreviation as a separate location. "FL" means the entire state of Florida. "KY" means the entire state of Kentucky.
 - If a state abbreviation is in the target list (e.g., "FL"), any city or location KNOWN to be in that state is ALSO considered in the target area. For example: "FL" is in the target list, and "Tampa" is a city in Florida, so "Tampa" is in the target area. "KY" is in the target list, and "Louisville" is a city in Kentucky, so "Louisville" is in the target area.
+- CRITICAL: If the search term contains a state abbreviation that IS in the target list (e.g., "TN" is in the target list and the term contains "TN"), then the term is ALWAYS geographically relevant. Do NOT flag it as out-of-area. The same applies to city names that are in the target list.
+- CRITICAL: Only flag a term as out-of-area when you are 100% certain the location is OUTSIDE the target area. If you are uncertain about a city's location, DO NOT flag it as out-of-area. Err on the side of Relevant.
 - Search terms that mention a specific location OUTSIDE the target area → Irrelevant (addLevel: "Campaign"), reason: "Outside target service area", and set outOfAreaLocation to the location name found.
 - Search terms with NO location or a location IN the target area → treat as geographically relevant (location alone does not make a term irrelevant).
 - Generic location terms (e.g. "near me", "local", "close by") → geographically relevant.
@@ -445,6 +465,26 @@ export async function analyzeSearchQueries(options: AnalysisOptions): Promise<Se
       for (const r of allResults) {
         if (r.isCompetitor && isOwnBrandTerm(r.searchTerm, brandTokens)) {
           r.isCompetitor = false;
+        }
+      }
+    }
+  }
+
+  // Post-process: correct AI out-of-area mistakes for known locations
+  const targetLocations = options.targetLocations?.trim() ?? "";
+  if (targetLocations) {
+    const normalizedTargets = normalizeTargetLocations(targetLocations);
+    for (const r of allResults) {
+      const termLower = r.searchTerm.toLowerCase();
+      // If the search term contains a known target location, and the AI flagged it
+      // as out-of-area, correct it
+      const found = normalizedTargets.find((loc) => termLower.includes(loc.toLowerCase()));
+      if (found) {
+        if (r.relevance === "Irrelevant" && (r.reason.toLowerCase().includes("area") || r.outOfAreaLocation)) {
+          r.relevance = "Relevant";
+          r.reason = "Matches target service area";
+          r.addLevel = "None";
+          r.outOfAreaLocation = null;
         }
       }
     }
