@@ -4,8 +4,10 @@
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
     "incremental": true,
-    "tsBuildInfoFile": ".tsbuildinfo",
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo", 
     "noEmit": true,
+    "sourceMap": false, 
+    "inlineSourceMap": false,
     "jsx": "preserve",
     "lib": ["esnext", "dom", "dom.iterable"],
     "resolveJsonModule": true,
